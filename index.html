@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Jokenpo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        #game {
+            display: none;
+        }
+
+        /* Hidden until room is joined */
+        #waiting {
+            color: #666;
+        }
+    </style>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+</head>
+
+<body>
+    <h1>Online Jokenpo</h1>
+
+    <div id="setup">
+        <input type="text" id="roomId" placeholder="Room ID">
+        <button onclick="joinRoom()">Join Room</button>
+        <button onclick="createRoom()">Create New Room</button>
+    </div>
+
+    <div id="waiting">Waiting for opponent...</div>
+
+    <div id="game">
+        <div class="choices">
+            <button onclick="playMove('rock')">✊ Rock</button>
+            <button onclick="playMove('paper')">✋ Paper</button>
+            <button onclick="playMove('scissors')">✌️ Scissors</button>
+        </div>
+        <div id="result"></div>
+        <div id="scores">
+            You: <span id="player-score">0</span> |
+            Opponent: <span id="opponent-score">0</span>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyApmrzJtIDsMpYSjLlP0LeRSAPjH3Ix_rE",
+            authDomain: "jokenpo-5525a.firebaseapp.com",
+            databaseURL: "https://jokenpo-5525a-default-rtdb.firebaseio.com",
+            projectId: "jokenpo-5525a",
+            storageBucket: "jokenpo-5525a.firebasestorage.app",
+            messagingSenderId: "297875424095",
+            appId: "1:297875424095:web:1c44efd898d65b11b76cea",
+            measurementId: "G-ZRP932KL1C"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let roomId;
+        let playerId = Math.random().toString(36).substring(2); // Random ID
+        let playerScore = 0;
+        let opponentScore = 0;
+
+        function createRoom() {
+            roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            joinRoom();
+        }
+
+        function joinRoom() {
+            roomId = document.getElementById('roomId').value || roomId;
+            if (!roomId) return;
+
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('waiting').style.display = 'block';
+
+            // Listen for game updates
+            database.ref(`rooms/${roomId}`).on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (!data) return;
+
+                if (data.player1 && data.player2) {
+                    document.getElementById('waiting').style.display = 'none';
+                    document.getElementById('game').style.display = 'block';
+
+                    // Check if both players made moves
+                    if (data.player1.move && data.player2.move) {
+                        const result = calculateWinner(data.player1.move, data.player2.move);
+                        document.getElementById('result').textContent = result;
+
+                        // Update scores
+                        if (result.includes("Player 1")) playerScore++;
+                        if (result.includes("Player 2")) opponentScore++;
+
+                        updateScores();
+
+                        // Clear moves after 2 seconds
+                        setTimeout(() => {
+                            database.ref(`rooms/${roomId}`).update({
+                                'player1/move': null,
+                                'player2/move': null
+                            });
+                        }, 2000);
+                    }
+                }
+            });
+
+            // Join as player 1 or 2
+            database.ref(`rooms/${roomId}`).transaction((room) => {
+                if (!room) return { player1: { id: playerId } };
+                if (!room.player1) return { ...room, player1: { id: playerId } };
+                if (!room.player2) return { ...room, player2: { id: playerId } };
+                return room;
+            });
+        }
+
+        function playMove(move) {
+            const playerRef = database.ref(`rooms/${roomId}/player1/id`).once('value').then((snap) => {
+                const path = snap.val() === playerId ? 'player1/move' : 'player2/move';
+                database.ref(`rooms/${roomId}/${path}`).set(move);
+            });
+        }
+
+        function calculateWinner(move1, move2) {
+            if (move1 === move2) return "It's a tie!";
+            if (
+                (move1 === 'rock' && move2 === 'scissors') ||
+                (move1 === 'paper' && move2 === 'rock') ||
+                (move1 === 'scissors' && move2 === 'paper')
+            ) return "Player 1 wins!";
+            return "Player 2 wins!";
+        }
+
+        function updateScores() {
+            document.getElementById('player-score').textContent = playerScore;
+            document.getElementById('opponent-score').textContent = opponentScore;
+        }
+    </script>
+</body>
+
+</html>
