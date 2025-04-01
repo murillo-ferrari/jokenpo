@@ -10,51 +10,105 @@
             font-family: Arial, sans-serif;
             text-align: center;
             margin-top: 30px;
+            background-color: #f5f5f5;
         }
 
         button {
-            padding: 10px 20px;
+            padding: 12px 24px;
             font-size: 18px;
-            margin: 5px;
+            margin: 10px;
             cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            background: #4285F4;
+            color: white;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #3367D6;
+            transform: scale(1.05);
+        }
+
+        #setup {
+            margin: 20px auto;
+            max-width: 400px;
         }
 
         #game {
             display: none;
+            margin-top: 30px;
         }
 
-        /* Hidden until room is joined */
         #waiting {
+            font-size: 20px;
             color: #666;
+            margin: 30px 0;
+        }
+
+        .choice-display {
+            font-size: 60px;
+            margin: 20px 0;
+        }
+
+        #result {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 20px 0;
+            min-height: 40px;
+            color: #2E7D32;
+        }
+
+        .scores {
+            font-size: 20px;
+            margin: 20px 0;
+        }
+
+        input {
+            padding: 10px;
+            font-size: 16px;
+            width: 200px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
         }
     </style>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
 </head>
 
 <body>
-    <h1>Online Jokenpo</h1>
+    <h1>🎮 Online Jokenpo</h1>
 
     <div id="setup">
-        <input type="text" id="roomId" placeholder="Room ID">
+        <input type="text" id="roomId" placeholder="Enter Room ID">
         <button onclick="joinRoom()">Join Room</button>
-        <button onclick="createRoom()">Create New Room</button>
+        <button onclick="createRoom()" style="background:#0F9D58">Create New Room</button>
     </div>
 
-    <div id="waiting">Waiting for opponent...</div>
+    <div id="waiting">Waiting for opponent to join...</div>
 
     <div id="game">
-        <div class="choices">
+        <h2>Make your move:</h2>
+        <div>
             <button onclick="playMove('rock')">✊ Rock</button>
             <button onclick="playMove('paper')">✋ Paper</button>
             <button onclick="playMove('scissors')">✌️ Scissors</button>
         </div>
-        <div id="result"></div>
-        <div id="scores">
-            You: <span id="player-score">0</span> |
-            Opponent: <span id="opponent-score">0</span>
+
+        <div class="choice-display">
+            <span id="player-choice"></span>
+            <span style="font-size:24px">vs</span>
+            <span id="opponent-choice"></span>
         </div>
+
+        <div id="result"></div>
+
+        <div class="scores">
+            <span style="color:#4285F4">You: <span id="player-score">0</span></span> |
+            <span style="color:#DB4437">Opponent: <span id="opponent-score">0</span></span>
+        </div>
+
+        <button onclick="resetGame()" style="background:#DB4437; margin-top:30px">Reset Game</button>
     </div>
 
     <script>
@@ -73,83 +127,156 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
+        // Game variables
         let roomId;
-        let playerId = Math.random().toString(36).substring(2); // Random ID
+        let playerId = Math.random().toString(36).substring(2, 15);
         let playerScore = 0;
         let opponentScore = 0;
+        let isPlayer1 = false;
+
+        // Emoji mappings
+        const emojis = {
+            'rock': '✊',
+            'paper': '✋',
+            'scissors': '✌️',
+            'waiting': '⌛'
+        };
 
         function createRoom() {
-            roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('roomId').value = roomId;
             joinRoom();
         }
 
         function joinRoom() {
-            roomId = document.getElementById('roomId').value || roomId;
-            if (!roomId) return;
+            roomId = document.getElementById('roomId').value.trim();
+            if (!roomId) {
+                alert("Please enter a room ID");
+                return;
+            }
 
             document.getElementById('setup').style.display = 'none';
             document.getElementById('waiting').style.display = 'block';
 
-            // Listen for game updates
-            database.ref(`rooms/${roomId}`).on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (!data) return;
+            const roomRef = database.ref(`rooms/${roomId}`);
 
-                if (data.player1 && data.player2) {
-                    document.getElementById('waiting').style.display = 'none';
-                    document.getElementById('game').style.display = 'block';
-
-                    // Check if both players made moves
-                    if (data.player1.move && data.player2.move) {
-                        const result = calculateWinner(data.player1.move, data.player2.move);
-                        document.getElementById('result').textContent = result;
-
-                        // Update scores
-                        if (result.includes("Player 1")) playerScore++;
-                        if (result.includes("Player 2")) opponentScore++;
-
-                        updateScores();
-
-                        // Clear moves after 2 seconds
-                        setTimeout(() => {
-                            database.ref(`rooms/${roomId}`).update({
-                                'player1/move': null,
-                                'player2/move': null
-                            });
-                        }, 2000);
+            // First check if room exists
+            roomRef.once('value').then(snapshot => {
+                if (!snapshot.exists()) {
+                    // Create new room as player 1
+                    isPlayer1 = true;
+                    return roomRef.set({
+                        player1: { id: playerId, move: null },
+                        player2: { id: null, move: null },
+                        lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                    });
+                } else {
+                    // Join existing room as player 2
+                    const room = snapshot.val();
+                    if (room.player2 && room.player2.id) {
+                        alert("Room is full!");
+                        location.reload();
+                        return;
                     }
+                    return roomRef.update({
+                        'player2/id': playerId,
+                        lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                    });
                 }
-            });
+            }).then(() => {
+                // Now listen for game updates
+                roomRef.on('value', snapshot => {
+                    const room = snapshot.val();
+                    if (!room) return;
 
-            // Join as player 1 or 2
-            database.ref(`rooms/${roomId}`).transaction((room) => {
-                if (!room) return { player1: { id: playerId } };
-                if (!room.player1) return { ...room, player1: { id: playerId } };
-                if (!room.player2) return { ...room, player2: { id: playerId } };
-                return room;
+                    // Show game when both players joined
+                    if (room.player1 && room.player1.id && room.player2 && room.player2.id) {
+                        document.getElementById('waiting').style.display = 'none';
+                        document.getElementById('game').style.display = 'block';
+
+                        // Check if both players made moves
+                        if (room.player1.move && room.player2.move) {
+                            showResults(room.player1, room.player2);
+                        } else {
+                            // Show waiting for opponent move
+                            const myMove = isPlayer1 ? room.player1.move : room.player2.move;
+                            const opponentMove = isPlayer1 ? room.player2.move : room.player1.move;
+
+                            document.getElementById('player-choice').textContent =
+                                myMove ? emojis[myMove] : '?';
+                            document.getElementById('opponent-choice').textContent =
+                                opponentMove ? emojis[opponentMove] : '?';
+                        }
+                    }
+                });
+            }).catch(error => {
+                console.error("Database error:", error);
+                alert("Error joining room. Please try again.");
+                location.reload();
             });
         }
 
         function playMove(move) {
-            const playerRef = database.ref(`rooms/${roomId}/player1/id`).once('value').then((snap) => {
-                const path = snap.val() === playerId ? 'player1/move' : 'player2/move';
-                database.ref(`rooms/${roomId}/${path}`).set(move);
+            const path = isPlayer1 ? 'player1/move' : 'player2/move';
+            database.ref(`rooms/${roomId}`).update({
+                [path]: move,
+                lastUpdated: firebase.database.ServerValue.TIMESTAMP
             });
+
+            // Show player's move immediately
+            document.getElementById('player-choice').textContent = emojis[move];
         }
 
-        function calculateWinner(move1, move2) {
-            if (move1 === move2) return "It's a tie!";
-            if (
-                (move1 === 'rock' && move2 === 'scissors') ||
-                (move1 === 'paper' && move2 === 'rock') ||
-                (move1 === 'scissors' && move2 === 'paper')
-            ) return "Player 1 wins!";
-            return "Player 2 wins!";
-        }
+        function showResults(player1, player2) {
+            const p1Move = player1.move;
+            const p2Move = player2.move;
 
-        function updateScores() {
+            // Display choices
+            document.getElementById('player-choice').textContent =
+                isPlayer1 ? emojis[p1Move] : emojis[p2Move];
+            document.getElementById('opponent-choice').textContent =
+                isPlayer1 ? emojis[p2Move] : emojis[p1Move];
+
+            // Calculate winner
+            let result;
+            if (p1Move === p2Move) {
+                result = "It's a tie!";
+            } else if (
+                (p1Move === 'rock' && p2Move === 'scissors') ||
+                (p1Move === 'paper' && p2Move === 'rock') ||
+                (p1Move === 'scissors' && p2Move === 'paper')
+            ) {
+                result = isPlayer1 ? "You win! 🎉" : "Opponent wins!";
+                if (isPlayer1) playerScore++;
+                else opponentScore++;
+            } else {
+                result = isPlayer1 ? "Opponent wins!" : "You win! 🎉";
+                if (!isPlayer1) playerScore++;
+                else opponentScore++;
+            }
+
+            document.getElementById('result').textContent = result;
             document.getElementById('player-score').textContent = playerScore;
             document.getElementById('opponent-score').textContent = opponentScore;
+
+            // Reset moves after 3 seconds
+            setTimeout(() => {
+                database.ref(`rooms/${roomId}`).update({
+                    'player1/move': null,
+                    'player2/move': null,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
+            }, 3000);
+        }
+
+        function resetGame() {
+            playerScore = 0;
+            opponentScore = 0;
+            document.getElementById('player-score').textContent = '0';
+            document.getElementById('opponent-score').textContent = '0';
+            document.getElementById('result').textContent = '';
+            document.getElementById('player-choice').textContent = '';
+            document.getElementById('opponent-choice').textContent = '';
         }
     </script>
 </body>
