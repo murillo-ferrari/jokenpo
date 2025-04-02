@@ -125,9 +125,10 @@
     <script>
     // Enhanced Firebase configuration loader
     function loadFirebaseConfig() {
-        try {
-            const rawConfig = '@@FIREBASE_CONFIG@@';
-            
+        // Define rawConfig at function scope
+        const rawConfig = '@@FIREBASE_CONFIG@@';
+        
+        try {            
             // Debug output to help troubleshoot
             console.log("Raw config received:", rawConfig.length > 50 ? 
                 rawConfig.substring(0, 50) + "..." : rawConfig);
@@ -171,7 +172,7 @@
         } catch (error) {
             console.error("Failed to load Firebase config:", {
                 error: error.message,
-                receivedConfig: rawConfig,
+                receivedConfig: rawConfig,  // Now properly referenced
                 configLength: rawConfig.length,
                 isBase64: /^[A-Za-z0-9+/]+={0,2}$/.test(rawConfig.trim())
             });
