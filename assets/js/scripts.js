@@ -150,18 +150,18 @@ function updateScores() {
   elements.opponentScore.textContent = opponentScore;
 }
 
-// Game Actions
+// Game Actions - THIS IS THE FIXED FUNCTION
 function playMove(move) {
-  const playerPath = isPlayer1 ? "player1" : "player2";
-
-  roomRef.child(playerPath).update({
-    move: move,
-    timestamp: firebase.database.ServerValue.TIMESTAMP
+  const movePath = isPlayer1 ? "player1/move" : "player2/move";
+  
+  roomRef.update({
+    [movePath]: move,
+    lastUpdated: firebase.database.ServerValue.TIMESTAMP
   });
 
   elements.playerChoice.textContent = "✓";
 
-  // Start new round if both players moved
+  // Check if both players have moved to advance round
   roomRef.once("value").then(snapshot => {
     const room = snapshot.val();
     if (room.player1.move && room.player2.move && room.round === currentRound) {
