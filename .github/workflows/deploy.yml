@@ -13,40 +13,49 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js (minimal)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: false  # Disable cache since we're not using package.json
 
-      - name: Inject Firebase Config
+      - name: Install required tools
+        run: npm install -g replace-in-file
+
+      - name: Inject Firebase configuration
         run: |
-          # Install replace-in-file without package.json
-          npm install -g replace-in-file
-          
-          # Generate and encode config
-          CONFIG=$(echo -n '{
-            "apiKey": "${{ secrets.FIREBASE_API_KEY }}",
-            "authDomain": "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
-            "databaseURL": "${{ secrets.FIREBASE_DATABASE_URL }}",
-            "projectId": "${{ secrets.FIREBASE_PROJECT_ID }}",
-            "storageBucket": "${{ secrets.FIREBASE_STORAGE_BUCKET }}",
-            "messagingSenderId": "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}",
-            "appId": "${{ secrets.FIREBASE_APP_ID }}"
-          }' | base64 -w 0)
-          
-          replace-in-file "@@FIREBASE_CONFIG@@" "$CONFIG" index.html
-          
-          # Verify injection
-          if ! grep -q "$CONFIG" index.html; then
-            echo "::error::Config injection failed"
+          # Generate the Firebase config JSON
+          FIREBASE_JSON=$(printf '{
+            "apiKey": "%s",
+            "authDomain": "%s",
+            "databaseURL": "%s",
+            "projectId": "%s",
+            "storageBucket": "%s",
+            "messagingSenderId": "%s",
+            "appId": "%s"
+          }' "${{ secrets.FIREBASE_API_KEY }}" \
+             "${{ secrets.FIREBASE_AUTH_DOMAIN }}" \
+             "${{ secrets.FIREBASE_DATABASE_URL }}" \
+             "${{ secrets.FIREBASE_PROJECT_ID }}" \
+             "${{ secrets.FIREBASE_STORAGE_BUCKET }}" \
+             "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}" \
+             "${{ secrets.FIREBASE_APP_ID }}")
+
+          # Convert to base64
+          FIREBASE_CONFIG=$(echo -n "$FIREBASE_JSON" | base64 -w 0)
+
+          # Replace placeholder in HTML file
+          replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" index.html
+
+          # Verify replacement
+          if ! grep -q "$FIREBASE_CONFIG" index.html; then
+            echo "::error::Failed to inject Firebase configuration"
             exit 1
           fi
 
-      - name: Upload Artifact
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
@@ -61,6 +70,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
