@@ -1,11 +1,11 @@
 // Firebase Initialization
-const firebaseConfig = JSON.parse(atob('@@FIREBASE_CONFIG@@'));
+const firebaseConfig = JSON.parse(atob("@@FIREBASE_CONFIG@@"));
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
 // Game State Variables
 let roomId;
-let playerId = 'player_' + Math.random().toString(36).slice(2, 11);
+let playerId = "player_" + Math.random().toString(36).slice(2, 11);
 let isPlayer1 = false;
 let roomRef;
 let currentRound = 0;
@@ -27,14 +27,14 @@ const elements = {
   resetConfirm: document.getElementById("reset-confirm"),
   rockBtn: document.getElementById("rock-btn"),
   paperBtn: document.getElementById("paper-btn"),
-  scissorsBtn: document.getElementById("scissors-btn")
+  scissorsBtn: document.getElementById("scissors-btn"),
 };
 
 // Emoji Mapping
 const emojis = {
   rock: "✊",
   paper: "✋",
-  scissors: "✌️"
+  scissors: "✌️",
 };
 
 // Room Management
@@ -57,52 +57,55 @@ function joinRoom() {
 
   roomRef = database.ref(`rooms/${roomId}`);
 
-  roomRef.transaction(currentData => {
-    if (!currentData) {
-      // Create new room as player1
-      isPlayer1 = true;
-      return {
-        player1: { 
-          id: playerId, 
-          move: null, 
-          timestamp: firebase.database.ServerValue.TIMESTAMP 
-        },
-        player2: { 
-          id: null, 
-          move: null, 
-          timestamp: null 
-        },
-        round: 0,
-        scores: { player1: 0, player2: 0 },
-        resetRequest: null,
-        lastUpdated: firebase.database.ServerValue.TIMESTAMP
-      };
-    } else {
-      // Join existing room
-      if (currentData.player2 && currentData.player2.id) {
-        throw new Error("Room is full! Please try another room.");
-      }
-      if (currentData.player1.id === playerId) {
+  roomRef.transaction(
+    (currentData) => {
+      if (!currentData) {
+        // Create new room as player1
         isPlayer1 = true;
-        return; // Already in room as player1
+        return {
+          player1: {
+            id: playerId,
+            move: null,
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+          },
+          player2: {
+            id: null,
+            move: null,
+            timestamp: null,
+          },
+          round: 0,
+          scores: { player1: 0, player2: 0 },
+          resetRequest: null,
+          lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+        };
+      } else {
+        // Join existing room
+        if (currentData.player2 && currentData.player2.id) {
+          throw new Error("Room is full! Please try another room.");
+        }
+        if (currentData.player1.id === playerId) {
+          isPlayer1 = true;
+          return; // Already in room as player1
+        }
+        currentData.player2 = {
+          id: playerId,
+          move: null,
+          timestamp: firebase.database.ServerValue.TIMESTAMP,
+        };
+        currentData.lastUpdated = firebase.database.ServerValue.TIMESTAMP;
+        return currentData;
       }
-      currentData.player2 = {
-        id: playerId,
-        move: null,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-      };
-      currentData.lastUpdated = firebase.database.ServerValue.TIMESTAMP;
-      return currentData;
+    },
+    (error, committed) => {
+      if (error) {
+        handleRoomError(error);
+      } else if (!committed) {
+        handleRoomError(new Error("Failed to join room"));
+      } else {
+        setupRoomListener();
+      }
     }
-  }, (error, committed) => {
-    if (error) {
-      handleRoomError(error);
-    } else if (!committed) {
-      handleRoomError(new Error("Failed to join room"));
-    } else {
-      setupRoomListener();
-    }
-  });
+  );
 }
 
 function handleRoomError(error) {
@@ -115,7 +118,7 @@ function handleRoomError(error) {
 
 // Real-time Game Listener
 function setupRoomListener() {
-  roomRef.on("value", snapshot => {
+  roomRef.on("value", (snapshot) => {
     const room = snapshot.val();
     if (!room) {
       alert("Room was deleted by the host");
@@ -175,8 +178,29 @@ function updateScores() {
 }
 
 function updateButtonState(myMove, theirMove) {
-  const shouldDisable = myMove || (theirMove && !myMove);
+  // Disable buttons ONLY if:
+  // - I already made a move (waiting for opponent)
+  // - OR the round is being calculated (both moved)
+  const shouldDisable = myMove || (myMove && theirMove);
   setButtonsDisabled(shouldDisable);
+
+  // Visual feedback - different states
+  const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
+  buttons.forEach((btn) => {
+    if (myMove && !theirMove) {
+      // I made move, waiting for opponent
+      btn.style.opacity = "0.5";
+      btn.style.cursor = "not-allowed";
+    } else if (myMove && theirMove) {
+      // Both moved, round in progress
+      btn.style.opacity = "0.5";
+      btn.style.cursor = "wait";
+    } else {
+      // Ready to make move
+      btn.style.opacity = "1";
+      btn.style.cursor = "pointer";
+    }
+  });
 }
 
 function setButtonsDisabled(disabled) {
@@ -184,36 +208,29 @@ function setButtonsDisabled(disabled) {
   elements.rockBtn.disabled = disabled;
   elements.paperBtn.disabled = disabled;
   elements.scissorsBtn.disabled = disabled;
-  
-  // Visual feedback
-  const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
-  buttons.forEach(btn => {
-    btn.style.opacity = disabled ? "0.5" : "1";
-    btn.style.cursor = disabled ? "not-allowed" : "pointer";
-  });
 }
 
 // Game Actions
 function playMove(move) {
   if (buttonsDisabled) return;
-  
+
   const movePath = isPlayer1 ? "player1/move" : "player2/move";
-  
+
   roomRef.update({
     [movePath]: move,
-    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
   });
 
   elements.playerChoice.textContent = "✓";
   setButtonsDisabled(true);
 
   // Check if both players have moved to advance round
-  roomRef.once("value").then(snapshot => {
+  roomRef.once("value").then((snapshot) => {
     const room = snapshot.val();
     if (room.player1.move && room.player2.move && room.round === currentRound) {
       roomRef.update({
         round: currentRound + 1,
-        lastUpdated: firebase.database.ServerValue.TIMESTAMP
+        lastUpdated: firebase.database.ServerValue.TIMESTAMP,
       });
     }
   });
@@ -249,9 +266,9 @@ function showResults(p1Move, p2Move) {
   roomRef.update({
     scores: {
       player1: isPlayer1 ? playerScore : opponentScore,
-      player2: isPlayer1 ? opponentScore : playerScore
+      player2: isPlayer1 ? opponentScore : playerScore,
     },
-    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
   });
 
   // Reset moves after 3 seconds and re-enable buttons
@@ -259,7 +276,7 @@ function showResults(p1Move, p2Move) {
     roomRef.update({
       "player1/move": null,
       "player2/move": null,
-      lastUpdated: firebase.database.ServerValue.TIMESTAMP
+      lastUpdated: firebase.database.ServerValue.TIMESTAMP,
     });
     elements.result.textContent = "";
     setButtonsDisabled(false);
@@ -271,9 +288,9 @@ function requestReset() {
   roomRef.update({
     resetRequest: {
       playerId: playerId,
-      timestamp: firebase.database.ServerValue.TIMESTAMP
+      timestamp: firebase.database.ServerValue.TIMESTAMP,
     },
-    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
   });
 }
 
@@ -283,7 +300,7 @@ function confirmReset(accept) {
     playerScore = 0;
     opponentScore = 0;
     updateScores();
-    
+
     // Update database
     roomRef.update({
       scores: { player1: 0, player2: 0 },
@@ -291,9 +308,9 @@ function confirmReset(accept) {
       "player1/move": null,
       "player2/move": null,
       round: 0,
-      lastUpdated: firebase.database.ServerValue.TIMESTAMP
+      lastUpdated: firebase.database.ServerValue.TIMESTAMP,
     });
-    
+
     // Reset UI
     elements.result.textContent = "";
     elements.playerChoice.textContent = "?";
@@ -304,7 +321,7 @@ function confirmReset(accept) {
     // Just clear the reset request
     roomRef.update({
       resetRequest: null,
-      lastUpdated: firebase.database.ServerValue.TIMESTAMP
+      lastUpdated: firebase.database.ServerValue.TIMESTAMP,
     });
   }
   elements.resetConfirm.style.display = "none";
