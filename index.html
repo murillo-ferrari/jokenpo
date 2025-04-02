@@ -357,5 +357,17 @@
     <!-- Load Firebase after we've set up our configuration -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+    <script>
+    // Fallback if Firebase config wasn't injected
+    if (window.location.href.includes('github.io')) {
+        try {
+            const decodedConfig = atob('@@FIREBASE_CONFIG@@');
+            JSON.parse(decodedConfig); // Verify it's valid JSON
+        } catch (e) {
+            alert("Failed to load game configuration. Please refresh the page.");
+            console.error("Configuration error:", e);
+        }
+    }
+</script>
 </body>
 </html>
