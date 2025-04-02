@@ -5,7 +5,7 @@ const database = firebase.database();
 
 // Game State Variables
 let roomId;
-let playerId = 'player_' + Math.random().toString(36).substr(2, 9);
+let playerId = 'player_' + Math.random().toString(36).slice(2, 11);
 let isPlayer1 = false;
 let roomRef;
 let currentRound = 0;
@@ -34,7 +34,7 @@ const emojis = {
 
 // Room Management
 function createRoom() {
-  roomId = Math.random().toString(36).substr(2, 4).toUpperCase();
+  roomId = Math.random().toString(36).slice(2, 6).toUpperCase();
   elements.roomIdInput.value = roomId;
   joinRoom();
 }
@@ -152,11 +152,11 @@ function updateScores() {
 
 // Game Actions
 function playMove(move) {
-  const path = isPlayer1 ? "player1/move" : "player2/move";
-  
-  roomRef.update({
-    [path]: move,
-    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+  const playerPath = isPlayer1 ? "player1" : "player2";
+
+  roomRef.child(playerPath).update({
+    move: move,
+    timestamp: firebase.database.ServerValue.TIMESTAMP
   });
 
   elements.playerChoice.textContent = "✓";
