@@ -72,80 +72,47 @@ try {
   function joinRoom() {
     roomId = document.getElementById("roomId").value.trim().toUpperCase();
     if (!roomId || roomId.length !== 4) {
-      alert("Please enter a valid 4-character room ID");
-      return;
+        alert("Please enter a valid 4-character room ID");
+        return;
     }
-
-    document.getElementById("setup").style.display = "none";
-    document.getElementById("waiting").style.display = "block";
 
     roomRef = database.ref(`rooms/${roomId}`);
 
     roomRef.once("value")
-      .then((snapshot) => {
-        if (!snapshot.exists()) {
-          // Create new room as player1
-          isPlayer1 = true;
-          return roomRef.set({
-            player1: { 
-              id: playerId, 
-              move: null,
-              ready: true,
-              timestamp: firebase.database.ServerValue.TIMESTAMP
-            },
-            player2: { 
-              id: null, 
-              move: null,
-              ready: false,
-              timestamp: null 
-            },
-            round: 0,
-            scores: { player1: 0, player2: 0 },
-            resetRequest: null,
-            lastUpdated: firebase.database.ServerValue.TIMESTAMP,
-            status: "waiting"
-          });
-        } else {
-          // Join existing room
-          const room = snapshot.val();
-          
-          // Check if already in room
-          if (room.player1.id === playerId) {
-            isPlayer1 = true;
-            return roomRef.update({
-              "player1/ready": true,
-              "player1/timestamp": firebase.database.ServerValue.TIMESTAMP,
-              lastUpdated: firebase.database.ServerValue.TIMESTAMP
-            });
-          }
-          
-          // Check if room is full
-          if (room.player2 && room.player2.id) {
-            throw new Error("Room is full! Please try another room.");
-          }
-          
-          // Join as player2
-          return roomRef.update({
-            "player2": {
-              id: playerId,
-              move: null,
-              ready: true,
-              timestamp: firebase.database.ServerValue.TIMESTAMP
-            },
-            status: "ready",
-            lastUpdated: firebase.database.ServerValue.TIMESTAMP
-          });
-        }
-      })
-      .then(() => {
-        setupRoomListener();
-      })
-      .catch((error) => {
-        console.error("Room error:", error);
-        document.getElementById("setup").style.display = "block";
-        document.getElementById("waiting").style.display = "none";
-        alert(error.message || "Error joining room. Please try again.");
-      });
+        .then((snapshot) => {
+            if (!snapshot.exists()) {
+                // Create new room
+                return roomRef.set({
+                    player1: { 
+                        id: playerId, 
+                        move: null,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    },
+                    player2: null,
+                    round: 0,
+                    scores: { player1: 0, player2: 0 },
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
+            } else {
+                // Join existing room
+                const room = snapshot.val();
+                if (room.player2 && room.player2.id) {
+                    throw new Error("Room is full");
+                }
+                return roomRef.update({
+                    player2: {
+                        id: playerId,
+                        move: null,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    },
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
+            }
+        })
+        .catch((error) => {
+            console.error("Room error:", error);
+            alert(error.message || "Error accessing room");
+        });
   }
 
   function setupRoomListener() {
