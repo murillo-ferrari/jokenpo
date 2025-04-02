@@ -68,44 +68,6 @@ jobs:
           fi
           
           echo "Config injected successfully"
-
-        run: |
-          # Generate proper JSON with jq
-          CONFIG_JSON=$(jq -n \
-            --arg apiKey "${{ secrets.FIREBASE_API_KEY }}" \
-            --arg authDomain "${{ secrets.FIREBASE_AUTH_DOMAIN }}" \
-            --arg databaseURL "${{ secrets.FIREBASE_DATABASE_URL }}" \
-            --arg projectId "${{ secrets.FIREBASE_PROJECT_ID }}" \
-            --arg storageBucket "${{ secrets.FIREBASE_STORAGE_BUCKET }}" \
-            --arg messagingSenderId "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}" \
-            --arg appId "${{ secrets.FIREBASE_APP_ID }}" \
-            '{
-              apiKey: $apiKey,
-              authDomain: $authDomain,
-              databaseURL: $databaseURL,
-              projectId: $projectId,
-              storageBucket: $storageBucket,
-              messagingSenderId: $messagingSenderId,
-              appId: $appId
-            }')
-          
-          echo "Generated config (redacted): ${CONFIG_JSON:0:50}..."
-          
-          # Convert to base64
-          FIREBASE_CONFIG=$(echo -n "$CONFIG_JSON" | base64 -w 0)
-          
-          # Replace placeholder
-          replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" index.html
-          
-          # Verify replacement
-          if ! grep -q "$FIREBASE_CONFIG" index.html; then
-            echo "::error::Config injection failed. Expected FIREBASE_CONFIG to be present in index.html."
-            echo "Expected config: $FIREBASE_CONFIG"
-            echo "File content (first 100 chars): $(head -c 100 index.html)"
-            exit 1
-          fi
-          
-          echo "Config injected successfully"
           
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
