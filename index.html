@@ -123,271 +123,318 @@
 
     <!-- Game Logic -->
     <script>
-        // Enhanced Firebase config loader
-        function loadFirebaseConfig() {
-            try {
-                // Get the raw injected value
-                const rawConfig = '@@FIREBASE_CONFIG@@';
-                console.log("Raw injected value:", rawConfig.length > 50 ? 
-                    rawConfig.substring(0, 50) + "..." : rawConfig);
-
-                // Clean and validate
-                const cleanConfig = rawConfig.trim();
-                if (!cleanConfig || cleanConfig === '@@FIREBASE_CONFIG@@') {
-                    throw new Error('Configuration not properly injected');
-                }
-
-                // Decode and parse
-                const decoded = atob(cleanConfig);
-                const config = JSON.parse(decoded);
-
-                // Verify required fields
-                const requiredFields = ['apiKey', 'authDomain', 'databaseURL', 'projectId'];
-                for (const field of requiredFields) {
-                    if (!config[field]) {
-                        throw new Error(`Missing required field: ${field}`);
-                    }
-                }
-
-                console.log("Successfully loaded Firebase config");
-                return config;
-
-            } catch (error) {
-                console.error("Configuration loading failed:", {
-                    error: error.message,
-                    received: '@@FIREBASE_CONFIG@@',
-                    length: '@@FIREBASE_CONFIG@@'.length
-                });
-                throw error;
-            }
-        }
-
-        // Main initialization
+    // Enhanced Firebase configuration loader
+    function loadFirebaseConfig() {
         try {
-            const firebaseConfig = loadFirebaseConfig();
-            const app = firebase.initializeApp(firebaseConfig);
-            const database = firebase.database();
-            console.log("Firebase initialized successfully!");
+            const rawConfig = '@@FIREBASE_CONFIG@@';
+            
+            // Debug output to help troubleshoot
+            console.log("Raw config received:", rawConfig.length > 50 ? 
+                rawConfig.substring(0, 50) + "..." : rawConfig);
 
-            // Game variables
-            let roomId;
-            let playerId = Math.random().toString(36).substring(2, 15);
-            let playerScore = 0;
-            let opponentScore = 0;
-            let isPlayer1 = false;
-            let roomRef;
-            let currentRound = 0;
-            
-            // Emoji mappings
-            const emojis = {
-                'rock': '✊',
-                'paper': '✋',
-                'scissors': '✌️'
-            };
-            
-            function createRoom() {
-                roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
-                document.getElementById('roomId').value = roomId;
-                joinRoom();
-            }
-            
-            function joinRoom() {
-                roomId = document.getElementById('roomId').value.trim();
-                if (!roomId) {
-                    alert("Please enter a room ID");
-                    return;
-                }
-                
-                document.getElementById('setup').style.display = 'none';
-                document.getElementById('waiting').style.display = 'block';
-                
-                roomRef = database.ref(`rooms/${roomId}`);
-                
-                roomRef.once('value').then(snapshot => {
-                    if (!snapshot.exists()) {
-                        isPlayer1 = true;
-                        return roomRef.set({
-                            player1: { id: playerId, move: null },
-                            player2: { id: null, move: null },
-                            round: 0,
-                            scores: { player1: 0, player2: 0 },
-                            resetRequest: null,
-                            lastUpdated: firebase.database.ServerValue.TIMESTAMP
-                        });
-                    } else {
-                        const room = snapshot.val();
-                        if (room.player2 && room.player2.id) {
-                            alert("Room is full!");
-                            location.reload();
-                            return;
-                        }
-                        return roomRef.update({
-                            'player2/id': playerId,
-                            lastUpdated: firebase.database.ServerValue.TIMESTAMP
-                        });
-                    }
-                }).then(() => {
-                    roomRef.on('value', snapshot => {
-                        const room = snapshot.val();
-                        if (!room) return;
-                        
-                        if (room.player1 && room.player1.id && room.player2 && room.player2.id) {
-                            document.getElementById('waiting').style.display = 'none';
-                            document.getElementById('game').style.display = 'block';
-                            
-                            if (room.scores) {
-                                playerScore = isPlayer1 ? room.scores.player1 : room.scores.player2;
-                                opponentScore = isPlayer1 ? room.scores.player2 : room.scores.player1;
-                                updateScores();
-                            }
-                            
-                            if (room.resetRequest) {
-                                if (room.resetRequest.playerId !== playerId) {
-                                    document.getElementById('reset-confirm').style.display = 'block';
-                                }
-                            } else {
-                                document.getElementById('reset-confirm').style.display = 'none';
-                            }
-                            
-                            if (room.player1.move && room.player2.move && room.round > currentRound) {
-                                currentRound = room.round;
-                                showResults(room.player1, room.player2);
-                            } else {
-                                document.getElementById('player-choice').textContent = 
-                                    (isPlayer1 ? room.player1.move : room.player2.move) ? '✓' : '?';
-                                document.getElementById('opponent-choice').textContent = '?';
-                                document.getElementById('result').textContent = 
-                                    (room.player1.move && room.player2.move) ? "Calculating..." : "";
-                            }
-                        }
-                    });
-                }).catch(error => {
-                    console.error("Database error:", error);
-                    alert("Error joining room. Please try again.");
-                    location.reload();
-                });
-            }
-            
-            function playMove(move) {
-                const path = isPlayer1 ? 'player1/move' : 'player2/move';
-                roomRef.update({
-                    [path]: move,
-                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
-                });
-                
-                document.getElementById('player-choice').textContent = '✓';
-                
-                roomRef.once('value').then(snapshot => {
-                    const room = snapshot.val();
-                    if (room.player1.move && room.player2.move && !room.round) {
-                        roomRef.update({
-                            round: 1
-                        });
-                    }
-                });
-            }
-            
-            function showResults(player1, player2) {
-                const p1Move = player1.move;
-                const p2Move = player2.move;
-                
-                document.getElementById('player-choice').textContent = emojis[p1Move];
-                document.getElementById('opponent-choice').textContent = emojis[p2Move];
-                
-                let result;
-                if (p1Move === p2Move) {
-                    result = "It's a tie!";
-                } else if (
-                    (p1Move === 'rock' && p2Move === 'scissors') ||
-                    (p1Move === 'paper' && p2Move === 'rock') ||
-                    (p1Move === 'scissors' && p2Move === 'paper')
-                ) {
-                    result = isPlayer1 ? "You win! 🎉" : "Opponent wins!";
-                    if (isPlayer1) playerScore++;
-                    else opponentScore++;
-                } else {
-                    result = isPlayer1 ? "Opponent wins!" : "You win! 🎉";
-                    if (!isPlayer1) playerScore++;
-                    else opponentScore++;
-                }
-                
-                document.getElementById('result').textContent = result;
-                updateScores();
-                
-                roomRef.update({
-                    'scores': {
-                        player1: isPlayer1 ? playerScore : opponentScore,
-                        player2: isPlayer1 ? opponentScore : playerScore
-                    }
-                });
-                
-                setTimeout(() => {
-                    roomRef.update({
-                        'player1/move': null,
-                        'player2/move': null,
-                        'round': 0,
-                        'result': null,
-                        lastUpdated: firebase.database.ServerValue.TIMESTAMP
-                    });
-                    document.getElementById('result').textContent = "";
-                    document.getElementById('player-choice').textContent = "?";
-                    document.getElementById('opponent-choice').textContent = "?";
-                }, 3000);
-            }
-            
-            function updateScores() {
-                document.getElementById('player-score').textContent = playerScore;
-                document.getElementById('opponent-score').textContent = opponentScore;
-            }
-            
-            function requestReset() {
-                roomRef.update({
-                    'resetRequest': {
-                        playerId: playerId,
-                        timestamp: firebase.database.ServerValue.TIMESTAMP
-                    }
-                });
-            }
-            
-            function confirmReset(accept) {
-                if (accept) {
-                    playerScore = 0;
-                    opponentScore = 0;
-                    updateScores();
-                    roomRef.update({
-                        'scores': { player1: 0, player2: 0 },
-                        'resetRequest': null,
-                        'player1/move': null,
-                        'player2/move': null,
-                        'round': 0,
-                        'result': null,
-                        lastUpdated: firebase.database.ServerValue.TIMESTAMP
-                    });
-                } else {
-                    roomRef.update({
-                        'resetRequest': null,
-                        lastUpdated: firebase.database.ServerValue.TIMESTAMP
-                    });
-                }
-                document.getElementById('reset-confirm').style.display = 'none';
+            // Check if the placeholder was actually replaced
+            if (rawConfig === '@@FIREBASE_CONFIG@@') {
+                throw new Error('Configuration not injected - placeholder still exists');
             }
 
-            // Make functions available globally
-            window.createRoom = createRoom;
-            window.joinRoom = joinRoom;
-            window.playMove = playMove;
-            window.requestReset = requestReset;
-            window.confirmReset = confirmReset;
+            // Clean and decode the configuration
+            const cleanConfig = rawConfig.trim();
+            const decodedConfig = atob(cleanConfig);
+            const config = JSON.parse(decodedConfig);
+
+            // Verify all required fields exist
+            const requiredFields = [
+                'apiKey', 
+                'authDomain', 
+                'databaseURL', 
+                'projectId',
+                'storageBucket',
+                'messagingSenderId',
+                'appId'
+            ];
+
+            for (const field of requiredFields) {
+                if (!config[field]) {
+                    throw new Error(`Missing required Firebase field: ${field}`);
+                }
+            }
+
+            console.log("Successfully loaded Firebase configuration:", {
+                apiKey: config.apiKey ? "***REDACTED***" : "MISSING",
+                authDomain: config.authDomain,
+                databaseURL: config.databaseURL,
+                projectId: config.projectId
+            });
+
+            return config;
 
         } catch (error) {
-            console.error("Initialization failed:", error);
-            document.getElementById('firebase-error').innerHTML = `
-                <strong>Initialization Error</strong><br>
-                ${error.message}<br>
-                Please refresh the page or try again later.
-            `;
-            document.getElementById('firebase-error').style.display = 'block';
+            console.error("Failed to load Firebase config:", {
+                error: error.message,
+                receivedConfig: rawConfig,
+                configLength: rawConfig.length,
+                isBase64: /^[A-Za-z0-9+/]+={0,2}$/.test(rawConfig.trim())
+            });
+            throw error;
         }
-    </script>
+    }
+
+    // Main game initialization
+    try {
+        // 1. Load and validate Firebase config
+        const firebaseConfig = loadFirebaseConfig();
+        
+        // 2. Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        console.log("Firebase initialized successfully!");
+
+        // Game state variables
+        let roomId;
+        let playerId = Math.random().toString(36).substring(2, 15);
+        let playerScore = 0;
+        let opponentScore = 0;
+        let isPlayer1 = false;
+        let roomRef;
+        let currentRound = 0;
+        
+        // Emoji mappings
+        const emojis = {
+            'rock': '✊',
+            'paper': '✋',
+            'scissors': '✌️'
+        };
+        
+        // Create a new game room
+        function createRoom() {
+            roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('roomId').value = roomId;
+            joinRoom();
+        }
+        
+        // Join an existing room
+        function joinRoom() {
+            roomId = document.getElementById('roomId').value.trim();
+            if (!roomId) {
+                alert("Please enter a room ID");
+                return;
+            }
+            
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('waiting').style.display = 'block';
+            
+            roomRef = database.ref(`rooms/${roomId}`);
+            
+            // First check if room exists
+            roomRef.once('value').then(snapshot => {
+                if (!snapshot.exists()) {
+                    // Create new room as player 1
+                    isPlayer1 = true;
+                    return roomRef.set({
+                        player1: { id: playerId, move: null },
+                        player2: { id: null, move: null },
+                        round: 0,
+                        scores: { player1: 0, player2: 0 },
+                        resetRequest: null,
+                        lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                    });
+                } else {
+                    // Join existing room as player 2
+                    const room = snapshot.val();
+                    if (room.player2 && room.player2.id) {
+                        alert("Room is full!");
+                        location.reload();
+                        return;
+                    }
+                    return roomRef.update({
+                        'player2/id': playerId,
+                        lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                    });
+                }
+            }).then(() => {
+                // Listen for game updates
+                roomRef.on('value', snapshot => {
+                    const room = snapshot.val();
+                    if (!room) return;
+                    
+                    // When both players join
+                    if (room.player1 && room.player1.id && room.player2 && room.player2.id) {
+                        document.getElementById('waiting').style.display = 'none';
+                        document.getElementById('game').style.display = 'block';
+                        
+                        // Update scores
+                        if (room.scores) {
+                            playerScore = isPlayer1 ? room.scores.player1 : room.scores.player2;
+                            opponentScore = isPlayer1 ? room.scores.player2 : room.scores.player1;
+                            updateScores();
+                        }
+                        
+                        // Handle reset requests
+                        if (room.resetRequest) {
+                            if (room.resetRequest.playerId !== playerId) {
+                                document.getElementById('reset-confirm').style.display = 'block';
+                            }
+                        } else {
+                            document.getElementById('reset-confirm').style.display = 'none';
+                        }
+                        
+                        // Check if both players made moves
+                        if (room.player1.move && room.player2.move && room.round > currentRound) {
+                            currentRound = room.round;
+                            showResults(room.player1, room.player2);
+                        } else {
+                            // Show waiting state
+                            document.getElementById('player-choice').textContent = 
+                                (isPlayer1 ? room.player1.move : room.player2.move) ? '✓' : '?';
+                            document.getElementById('opponent-choice').textContent = '?';
+                            document.getElementById('result').textContent = 
+                                (room.player1.move && room.player2.move) ? "Calculating..." : "";
+                        }
+                    }
+                });
+            }).catch(error => {
+                console.error("Database error:", error);
+                alert("Error joining room. Please try again.");
+                location.reload();
+            });
+        }
+        
+        // Handle player moves
+        function playMove(move) {
+            const path = isPlayer1 ? 'player1/move' : 'player2/move';
+            roomRef.update({
+                [path]: move,
+                lastUpdated: firebase.database.ServerValue.TIMESTAMP
+            });
+            
+            // Show confirmation
+            document.getElementById('player-choice').textContent = '✓';
+            
+            // Check if both players moved
+            roomRef.once('value').then(snapshot => {
+                const room = snapshot.val();
+                if (room.player1.move && room.player2.move && !room.round) {
+                    roomRef.update({
+                        round: 1
+                    });
+                }
+            });
+        }
+        
+        // Show game results
+        function showResults(player1, player2) {
+            const p1Move = player1.move;
+            const p2Move = player2.move;
+            
+            // Display choices
+            document.getElementById('player-choice').textContent = emojis[p1Move];
+            document.getElementById('opponent-choice').textContent = emojis[p2Move];
+            
+            // Calculate winner
+            let result;
+            if (p1Move === p2Move) {
+                result = "It's a tie!";
+            } else if (
+                (p1Move === 'rock' && p2Move === 'scissors') ||
+                (p1Move === 'paper' && p2Move === 'rock') ||
+                (p1Move === 'scissors' && p2Move === 'paper')
+            ) {
+                result = isPlayer1 ? "You win! 🎉" : "Opponent wins!";
+                if (isPlayer1) playerScore++;
+                else opponentScore++;
+            } else {
+                result = isPlayer1 ? "Opponent wins!" : "You win! 🎉";
+                if (!isPlayer1) playerScore++;
+                else opponentScore++;
+            }
+            
+            document.getElementById('result').textContent = result;
+            updateScores();
+            
+            // Update scores in database
+            roomRef.update({
+                'scores': {
+                    player1: isPlayer1 ? playerScore : opponentScore,
+                    player2: isPlayer1 ? opponentScore : playerScore
+                }
+            });
+            
+            // Reset moves after 3 seconds
+            setTimeout(() => {
+                roomRef.update({
+                    'player1/move': null,
+                    'player2/move': null,
+                    'round': 0,
+                    'result': null,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
+                document.getElementById('result').textContent = "";
+                document.getElementById('player-choice').textContent = "?";
+                document.getElementById('opponent-choice').textContent = "?";
+            }, 3000);
+        }
+        
+        // Update score display
+        function updateScores() {
+            document.getElementById('player-score').textContent = playerScore;
+            document.getElementById('opponent-score').textContent = opponentScore;
+        }
+        
+        // Request game reset
+        function requestReset() {
+            roomRef.update({
+                'resetRequest': {
+                    playerId: playerId,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                }
+            });
+        }
+        
+        // Confirm or deny reset
+        function confirmReset(accept) {
+            if (accept) {
+                // Reset scores
+                playerScore = 0;
+                opponentScore = 0;
+                updateScores();
+                roomRef.update({
+                    'scores': { player1: 0, player2: 0 },
+                    'resetRequest': null,
+                    'player1/move': null,
+                    'player2/move': null,
+                    'round': 0,
+                    'result': null,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
+            } else {
+                // Deny reset
+                roomRef.update({
+                    'resetRequest': null,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
+            }
+            document.getElementById('reset-confirm').style.display = 'none';
+        }
+
+        // Make functions available globally
+        window.createRoom = createRoom;
+        window.joinRoom = joinRoom;
+        window.playMove = playMove;
+        window.requestReset = requestReset;
+        window.confirmReset = confirmReset;
+
+    } catch (error) {
+        console.error("Game initialization failed:", error);
+        document.getElementById('firebase-error').innerHTML = `
+            <strong>Game Initialization Error</strong><br>
+            ${error.message}<br><br>
+            Please try:<br>
+            1. Hard refreshing the page (Ctrl+F5)<br>
+            2. Checking your internet connection<br>
+            3. Contacting support if the problem persists
+        `;
+        document.getElementById('firebase-error').style.display = 'block';
+    }
+</script>
 </body>
 </html>
