@@ -5,39 +5,30 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
-# Allow GitHub Pages deployment
 permissions:
-  contents: read
   pages: write
   id-token: write
 
-# Only one concurrent deployment
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
-
 jobs:
   build:
-    name: Build and Inject Configuration
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js (minimal)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: false  # Disable cache since we're not using package.json
 
-      - name: Install replace-in-file
-        run: npm install replace-in-file
-
-      - name: Inject Firebase Configuration
+      - name: Inject Firebase Config
         run: |
-          # Create properly formatted JSON
-          FIREBASE_JSON=$(cat <<EOF
-          {
+          # Install replace-in-file without package.json
+          npm install -g replace-in-file
+          
+          # Generate and encode config
+          CONFIG=$(echo -n '{
             "apiKey": "${{ secrets.FIREBASE_API_KEY }}",
             "authDomain": "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
             "databaseURL": "${{ secrets.FIREBASE_DATABASE_URL }}",
@@ -45,43 +36,31 @@ jobs:
             "storageBucket": "${{ secrets.FIREBASE_STORAGE_BUCKET }}",
             "messagingSenderId": "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}",
             "appId": "${{ secrets.FIREBASE_APP_ID }}"
-          }
-          EOF
-          )
-
-          # Convert to base64
-          FIREBASE_CONFIG=$(echo -n "$FIREBASE_JSON" | base64 -w 0)
-
-          # Replace placeholder in HTML file
-          npx replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" index.html
-
-          # Verify replacement
-          if ! grep -q "$FIREBASE_CONFIG" index.html; then
-            echo "::error::Failed to inject Firebase configuration"
+          }' | base64 -w 0)
+          
+          replace-in-file "@@FIREBASE_CONFIG@@" "$CONFIG" index.html
+          
+          # Verify injection
+          if ! grep -q "$CONFIG" index.html; then
+            echo "::error::Config injection failed"
             exit 1
           fi
-        env:
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
 
-      - name: Upload artifact
+      - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: .
 
   deploy:
-    name: Deploy to GitHub Pages
     needs: build
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
