@@ -1,23 +1,26 @@
-// Bulletproof configuration loader
+// Enhanced Firebase configuration loader
 function loadFirebaseConfig() {
-  const injectedConfig = "@@FIREBASE_CONFIG@@";
-
   try {
-    console.log("Raw injected config:", injectedConfig);
+    // Get the raw injected value
+    const rawConfig = "@@FIREBASE_CONFIG@@";
 
-    // Verify injection occurred
-    if (injectedConfig === "@@FIREBASE_CONFIG@@") {
+    // Debug output to verify injection
+    console.log(
+      "Raw injected value:",
+      rawConfig.length > 50 ? rawConfig.substring(0, 50) + "..." : rawConfig
+    );
+
+    // Check if injection occurred
+    if (rawConfig === "@@FIREBASE_CONFIG@@") {
       throw new Error("Configuration not injected - placeholder remains");
     }
 
     // Clean and decode
-    const cleanConfig = injectedConfig.trim();
+    const cleanConfig = rawConfig.trim();
     const decoded = atob(cleanConfig);
-    console.log("Decoded config:", decoded);
-
     const config = JSON.parse(decoded);
 
-    // Verify required fields with better error messages
+    // Verify required fields
     const requiredFields = {
       apiKey: "API Key",
       authDomain: "Auth Domain",
@@ -27,22 +30,17 @@ function loadFirebaseConfig() {
 
     for (const [field, name] of Object.entries(requiredFields)) {
       if (!config[field]) {
-        throw new Error(
-          `Configuration error: Missing ${name} in Firebase config`
-        );
+        throw new Error(`Missing required field: ${name}`);
       }
     }
 
+    console.log("Successfully loaded Firebase config");
     return config;
   } catch (error) {
     console.error("Configuration Error Details:", {
       error: error.message,
-      receivedConfig: injectedConfig,
-      decodedConfig:
-        injectedConfig !== "@@FIREBASE_CONFIG@@"
-          ? atob(injectedConfig.trim())
-          : "Not decoded",
-      isPlaceholder: injectedConfig === "@@FIREBASE_CONFIG@@",
+      receivedConfig: "@@FIREBASE_CONFIG@@",
+      isPlaceholder: "@@FIREBASE_CONFIG@@" === "@@FIREBASE_CONFIG@@",
     });
     throw error;
   }
@@ -51,16 +49,12 @@ function loadFirebaseConfig() {
 // Main initialization
 try {
   // 1. Load config
-  const firebaseConfig = JSON.parse(atob('@@FIREBASE_CONFIG@@'));
+  const firebaseConfig = loadFirebaseConfig();
 
   // 2. Initialize Firebase
   const app = firebase.initializeApp(firebaseConfig);
   const database = firebase.database();
-  console.log("Firebase initialized with config:", {
-    apiKey: firebaseConfig.apiKey ? "***REDACTED***" : "MISSING",
-    authDomain: firebaseConfig.authDomain,
-    databaseURL: firebaseConfig.databaseURL,
-  });
+  console.log("Firebase initialized successfully!");
 
   // Game state variables
   let roomId;
@@ -82,13 +76,12 @@ try {
     roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     document.getElementById("roomId").value = roomId;
 
+    // Show room creation message
     const roomDisplay = document.createElement("div");
     roomDisplay.id = "room-display";
     roomDisplay.className = "room-display";
-    roomDisplay.textContent = `Room created! Share this ID with your friend: ${roomId}`;
-
-    const setupDiv = document.getElementById("setup");
-    setupDiv.appendChild(roomDisplay);
+    roomDisplay.textContent = `Room created! Share ID: ${roomId}`;
+    document.getElementById("setup").appendChild(roomDisplay);
 
     joinRoom();
   }
@@ -303,16 +296,14 @@ try {
   window.requestReset = requestReset;
   window.confirmReset = confirmReset;
 } catch (error) {
-  console.error("FATAL INIT ERROR:", error);
+  console.error("Initialization failed:", error);
   document.getElementById("firebase-error").innerHTML = `
-            <strong>Configuration Error</strong><br>
-            Failed to initialize game services.<br><br>
-            <strong>Technical Details:</strong><br>
+            <strong>Initialization Error</strong><br>
             ${error.message}<br><br>
-            <strong>Please try:</strong><br>
-            1. Hard refresh (Ctrl+F5)<br>
-            2. Check browser console for details<br>
-            3. Contact support if it persists
+            Please try:<br>
+            1. Hard refreshing (Ctrl+F5)<br>
+            2. Checking your connection<br>
+            3. Contacting support if it persists
         `;
   document.getElementById("firebase-error").style.display = "block";
 }
