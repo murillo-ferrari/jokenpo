@@ -3,7 +3,6 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
 
 permissions:
   pages: write
@@ -25,7 +24,7 @@ jobs:
         
       - name: Inject Firebase config
         run: |
-          # Create properly formatted JSON
+          # Generate perfect JSON with jq
           FIREBASE_JSON=$(jq -n \
             --arg apiKey "${{ secrets.FIREBASE_API_KEY }}" \
             --arg authDomain "${{ secrets.FIREBASE_AUTH_DOMAIN }}" \
@@ -44,25 +43,24 @@ jobs:
               appId: $appId
             }')
           
-          # Convert to base64
+          # Create clean base64 (remove all whitespace)
           FIREBASE_CONFIG=$(echo -n "$FIREBASE_JSON" | base64 -w 0 | tr -d '\n')
           
-          # Debug output (shows first 10 chars only)
-          echo "Config prefix: ${FIREBASE_CONFIG:0:10}..."
-          
-          # Replace placeholder
-          if ! replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" index.html; then
-            echo "::error::Failed to replace Firebase config"
+          # Verify base64 is valid
+          if ! echo "$FIREBASE_CONFIG" | base64 -d > /dev/null 2>&1; then
+            echo "::error::Invalid base64 generated"
             exit 1
           fi
           
-          # Verify replacement
+          # Replace in file and verify
+          replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" index.html
+          
           if ! grep -q "$FIREBASE_CONFIG" index.html; then
-            echo "::error::Config replacement verification failed"
+            echo "::error::Config injection failed"
             exit 1
           fi
           
-          echo "Firebase config injected successfully"
+          echo "Config injected successfully"
           
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
