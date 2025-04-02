@@ -51,7 +51,7 @@ function loadFirebaseConfig() {
 // Main initialization
 try {
   // 1. Load config
-  const firebaseConfig = loadFirebaseConfig();
+  const firebaseConfig = JSON.parse(atob('@@FIREBASE_CONFIG@@'));
 
   // 2. Initialize Firebase
   const app = firebase.initializeApp(firebaseConfig);
