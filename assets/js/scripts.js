@@ -11,6 +11,7 @@ let roomRef;
 let currentRound = 0;
 let playerScore = 0;
 let opponentScore = 0;
+let buttonsDisabled = false;
 
 // DOM Elements
 const elements = {
@@ -23,7 +24,10 @@ const elements = {
   result: document.getElementById("result"),
   playerScore: document.getElementById("player-score"),
   opponentScore: document.getElementById("opponent-score"),
-  resetConfirm: document.getElementById("reset-confirm")
+  resetConfirm: document.getElementById("reset-confirm"),
+  rockBtn: document.getElementById("rock-btn"),
+  paperBtn: document.getElementById("paper-btn"),
+  scissorsBtn: document.getElementById("scissors-btn")
 };
 
 // Emoji Mapping
@@ -143,6 +147,11 @@ function setupRoomListener() {
         elements.resetConfirm.style.display = "none";
       }
 
+      // Handle button state
+      const myMove = isPlayer1 ? room.player1.move : room.player2.move;
+      const theirMove = isPlayer1 ? room.player2.move : room.player1.move;
+      updateButtonState(myMove, theirMove);
+
       // Handle completed round
       if (room.player1.move && room.player2.move && room.round > currentRound) {
         currentRound = room.round;
@@ -165,8 +174,29 @@ function updateScores() {
   elements.opponentScore.textContent = opponentScore;
 }
 
+function updateButtonState(myMove, theirMove) {
+  const shouldDisable = myMove || (theirMove && !myMove);
+  setButtonsDisabled(shouldDisable);
+}
+
+function setButtonsDisabled(disabled) {
+  buttonsDisabled = disabled;
+  elements.rockBtn.disabled = disabled;
+  elements.paperBtn.disabled = disabled;
+  elements.scissorsBtn.disabled = disabled;
+  
+  // Visual feedback
+  const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
+  buttons.forEach(btn => {
+    btn.style.opacity = disabled ? "0.5" : "1";
+    btn.style.cursor = disabled ? "not-allowed" : "pointer";
+  });
+}
+
 // Game Actions
 function playMove(move) {
+  if (buttonsDisabled) return;
+  
   const movePath = isPlayer1 ? "player1/move" : "player2/move";
   
   roomRef.update({
@@ -175,6 +205,7 @@ function playMove(move) {
   });
 
   elements.playerChoice.textContent = "✓";
+  setButtonsDisabled(true);
 
   // Check if both players have moved to advance round
   roomRef.once("value").then(snapshot => {
@@ -223,7 +254,7 @@ function showResults(p1Move, p2Move) {
     lastUpdated: firebase.database.ServerValue.TIMESTAMP
   });
 
-  // Reset moves after 3 seconds
+  // Reset moves after 3 seconds and re-enable buttons
   setTimeout(() => {
     roomRef.update({
       "player1/move": null,
@@ -231,6 +262,7 @@ function showResults(p1Move, p2Move) {
       lastUpdated: firebase.database.ServerValue.TIMESTAMP
     });
     elements.result.textContent = "";
+    setButtonsDisabled(false);
   }, 3000);
 }
 
@@ -267,6 +299,7 @@ function confirmReset(accept) {
     elements.playerChoice.textContent = "?";
     elements.opponentChoice.textContent = "?";
     currentRound = 0;
+    setButtonsDisabled(false);
   } else {
     // Just clear the reset request
     roomRef.update({
