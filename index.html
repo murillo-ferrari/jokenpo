@@ -42,9 +42,10 @@
         </div>
 
         <button onclick="requestReset()" style="background:#DB4437; margin-top:30px">Reset Game</button>
-        <div id="reset-confirm">
+        <div id="reset-confirm"
+            style="display:none; margin-top:10px; padding:10px; background:#f0f0f0; border-radius:5px;">
             <p>Opponent wants to reset. Accept?</p>
-            <button onclick="confirmReset(true)" style="background:#0F9D58">Yes</button>
+            <button onclick="confirmReset(true)" style="background:#0F9D58; margin-right:10px;">Yes</button>
             <button onclick="confirmReset(false)" style="background:#DB4437">No</button>
         </div>
     </div>
