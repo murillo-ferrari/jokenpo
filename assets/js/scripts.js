@@ -121,8 +121,9 @@ try {
         } else {
           const room = snapshot.val();
           if (room.player2 && room.player2.id) {
-            alert("Room is full!");
-            location.reload();
+            const messageContainer = document.getElementById("message-container");
+            messageContainer.textContent = "Room is full! Please try another room.";
+            messageContainer.style.display = "block";
             return;
           }
           return roomRef.update({
