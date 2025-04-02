@@ -71,6 +71,7 @@
             display: none;
         }
     </style>
+    <div id="firebase-error" style="display: none; color: red; font-weight: bold; padding: 10px;"></div>
 </head>
 <body>
     <h1>🎮 Online Jokenpo</h1>
@@ -358,16 +359,20 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
     <script>
-    // Fallback if Firebase config wasn't injected
-    if (window.location.href.includes('github.io')) {
-        try {
-            const decodedConfig = atob('@@FIREBASE_CONFIG@@');
-            JSON.parse(decodedConfig); // Verify it's valid JSON
-        } catch (e) {
-            alert("Failed to load game configuration. Please refresh the page.");
-            console.error("Configuration error:", e);
-        }
-    }
-</script>
+        // Debugging and fallback
+        (function() {
+            try {
+                const configStr = atob('@@FIREBASE_CONFIG@@');
+                const config = JSON.parse(configStr);
+                if (!config.apiKey) throw new Error("Invalid config");
+                console.log("Firebase config loaded successfully");
+            } catch (e) {
+                console.error("Configuration error:", e);
+                document.getElementById('firebase-error').textContent = 
+                    "Failed to load game configuration. Please refresh the page.";
+                document.getElementById('firebase-error').style.display = 'block';
+            }
+        })();
+    </script>
 </body>
 </html>
