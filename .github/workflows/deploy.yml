@@ -5,28 +5,39 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+# Allow GitHub Pages deployment
 permissions:
+  contents: read
   pages: write
   id-token: write
 
+# Only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Build and Inject Configuration
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 16
-          
-      - name: Install dependencies
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install replace-in-file
         run: npm install replace-in-file
-        
-      - name: Inject Firebase config
+
+      - name: Inject Firebase Configuration
         run: |
-          # Ensure JSON is properly formatted and encoded
-          FIREBASE_CONFIG=$(echo -n '{
+          # Create properly formatted JSON
+          FIREBASE_JSON=$(cat <<EOF
+          {
             "apiKey": "${{ secrets.FIREBASE_API_KEY }}",
             "authDomain": "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
             "databaseURL": "${{ secrets.FIREBASE_DATABASE_URL }}",
@@ -34,14 +45,19 @@ jobs:
             "storageBucket": "${{ secrets.FIREBASE_STORAGE_BUCKET }}",
             "messagingSenderId": "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}",
             "appId": "${{ secrets.FIREBASE_APP_ID }}"
-          }' | jq -c | base64 -w 0)
-          
-          echo "Using Firebase config (truncated): ${FIREBASE_CONFIG:0:30}..."
+          }
+          EOF
+          )
+
+          # Convert to base64
+          FIREBASE_CONFIG=$(echo -n "$FIREBASE_JSON" | base64 -w 0)
+
+          # Replace placeholder in HTML file
           npx replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" index.html
-          
+
           # Verify replacement
           if ! grep -q "$FIREBASE_CONFIG" index.html; then
-            echo "::error::Failed to inject Firebase config"
+            echo "::error::Failed to inject Firebase configuration"
             exit 1
           fi
         env:
@@ -52,18 +68,15 @@ jobs:
           FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-      
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
-          path: .
-          retention-days: 1
+          path: '.'
 
   deploy:
+    name: Deploy to GitHub Pages
     needs: build
-    permissions:
-      pages: write
-      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -71,4 +84,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v3
+        uses: actions/deploy-pages@v4
