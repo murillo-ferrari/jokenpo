@@ -155,10 +155,13 @@ function setupRoomListener() {
       const theirMove = isPlayer1 ? room.player2.move : room.player1.move;
       updateButtonState(myMove, theirMove);
 
-      // Handle completed round
+      // Handle completed round - FIXED CALCULATION TRIGGER
       if (room.player1.move && room.player2.move && room.round > currentRound) {
         currentRound = room.round;
-        showResults(room.player1.move, room.player2.move);
+        // Use setTimeout to ensure UI updates before showing results
+        setTimeout(() => {
+          showResults(room.player1.move, room.player2.move);
+        }, 100);
       }
     }
   });
@@ -180,7 +183,7 @@ function updateScores() {
 function updateButtonState(myMove, theirMove) {
   // Disable buttons ONLY if:
   // - I already made a move (waiting for opponent)
-  // - OR the round is being calculated (both moved)
+  // - OR both players have moved (round in progress)
   const shouldDisable = myMove || (myMove && theirMove);
   setButtonsDisabled(shouldDisable);
 
@@ -210,7 +213,7 @@ function setButtonsDisabled(disabled) {
   elements.scissorsBtn.disabled = disabled;
 }
 
-// Game Actions
+// Game Actions - FIXED MOVE REGISTRATION
 function playMove(move) {
   if (buttonsDisabled) return;
 
@@ -222,8 +225,10 @@ function playMove(move) {
     let playerPath;
     if (room.player1.id === playerId) {
       playerPath = "player1";
+      isPlayer1 = true;
     } else if (room.player2.id === playerId) {
       playerPath = "player2";
+      isPlayer1 = false;
     } else {
       console.error("Player ID mismatch!");
       return;
@@ -232,26 +237,26 @@ function playMove(move) {
     // Update our move
     const updates = {};
     updates[`${playerPath}/move`] = move;
-    updates[`${playerPath}/timestamp`] =
-      firebase.database.ServerValue.TIMESTAMP;
+    updates[`${playerPath}/timestamp`] = firebase.database.ServerValue.TIMESTAMP;
     updates["lastUpdated"] = firebase.database.ServerValue.TIMESTAMP;
 
-    roomRef.update(updates).then(() => {
-      elements.playerChoice.textContent = "✓";
-      setButtonsDisabled(true);
+    return roomRef.update(updates);
+  }).then(() => {
+    elements.playerChoice.textContent = "✓";
+    setButtonsDisabled(true);
 
-      // Check if both players have moved
-      if (
-        room.player1.move &&
-        room.player2.move &&
-        room.round === currentRound
-      ) {
-        roomRef.update({
-          round: currentRound + 1,
-          lastUpdated: firebase.database.ServerValue.TIMESTAMP,
-        });
-      }
-    });
+    // Check if both players have moved to advance round
+    return roomRef.once("value");
+  }).then(snapshot => {
+    const room = snapshot.val();
+    if (room.player1.move && room.player2.move && room.round === currentRound) {
+      return roomRef.update({
+        round: currentRound + 1,
+        lastUpdated: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+  }).catch(error => {
+    console.error("Move error:", error);
   });
 }
 
