@@ -1,0 +1,92 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin-top: 30px;
+    background-color: #f5f5f5;
+}
+
+button {
+    padding: 12px 24px;
+    font-size: 18px;
+    margin: 10px;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    background: #4285F4;
+    color: white;
+    transition: all 0.3s;
+}
+
+button:hover {
+    background: #3367D6;
+    transform: scale(1.05);
+}
+
+#setup {
+    margin: 20px auto;
+    max-width: 400px;
+}
+
+#game {
+    display: none;
+    margin-top: 30px;
+}
+
+#waiting {
+    font-size: 20px;
+    color: #666;
+    margin: 30px 0;
+}
+
+.choice-display {
+    font-size: 60px;
+    margin: 20px 0;
+}
+
+#result {
+    font-size: 28px;
+    font-weight: bold;
+    margin: 20px 0;
+    min-height: 40px;
+    color: #2E7D32;
+}
+
+.scores {
+    font-size: 20px;
+    margin: 20px 0;
+}
+
+input {
+    padding: 10px;
+    font-size: 16px;
+    width: 200px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+#reset-confirm {
+    display: none;
+    margin-top: 20px;
+}
+
+#firebase-error {
+    color: #d32f2f;
+    background: #fde8e8;
+    padding: 15px;
+    margin: 20px auto;
+    max-width: 500px;
+    border-radius: 5px;
+    display: none;
+}
+
+.room-display {
+    font-size: 18px;
+    color: #333;
+    background: #e3f2fd;
+    padding: 15px;
+    margin: 20px auto;
+    max-width: 400px;
+    border-radius: 5px;
+    border: 1px solid #90caf9;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
