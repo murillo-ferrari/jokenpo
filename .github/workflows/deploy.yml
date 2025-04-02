@@ -20,20 +20,11 @@ jobs:
           node-version: '20'
           
       - name: Install dependencies
-        run: npm install -g replace-in-file jq
+        run: npm install -g replace-in-file
         
-      - name: Validate Secrets
+      - name: Inject Firebase config
         run: |
-          echo "Checking secrets existence..."
-          if [ -z "${{ secrets.FIREBASE_API_KEY }}" ]; then
-            echo "::error::FIREBASE_API_KEY is empty"
-            exit 1
-          fi
-          echo "All secrets exist"
-          
-      - name: Generate and Inject Firebase Config
-        run: |
-          # Create JSON config
+          # Create the config JSON
           CONFIG_JSON='{
             "apiKey": "${{ secrets.FIREBASE_API_KEY }}",
             "authDomain": "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
@@ -44,30 +35,24 @@ jobs:
             "appId": "${{ secrets.FIREBASE_APP_ID }}"
           }'
           
-          echo "Config JSON created"
-          
           # Convert to base64
           FIREBASE_CONFIG=$(echo -n "$CONFIG_JSON" | base64 -w 0)
-          echo "Base64 config created (first 20 chars): ${FIREBASE_CONFIG:0:20}..."
           
-          # Verify index.html exists
-          if [ ! -f "index.html" ]; then
-            echo "::error::index.html not found"
+          # Debug output
+          echo "Firebase config (first 20 chars): ${FIREBASE_CONFIG:0:20}..."
+          
+          # Replace in file
+          npx replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" index.html
+          
+          # Verify
+          if grep -q "$FIREBASE_CONFIG" index.html; then
+            echo "Config injected successfully"
+          else
+            echo "::error::Injection failed - placeholder not found"
+            echo "Current file content:"
+            head -n 20 index.html
             exit 1
           fi
-          
-          # Replace using sed (more reliable)
-          sed -i "s|@@FIREBASE_CONFIG@@|$FIREBASE_CONFIG|g" index.html
-          
-          # Verify replacement
-          if ! grep -q "$FIREBASE_CONFIG" index.html; then
-            echo "::error::Config injection verification failed"
-            echo "Current placeholder value:"
-            grep "@@FIREBASE_CONFIG@@" index.html || echo "Not found"
-            exit 1
-          fi
-          
-          echo "Config injected successfully"
           
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
