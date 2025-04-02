@@ -42,15 +42,15 @@ jobs:
           echo "Firebase config (first 20 chars): ${FIREBASE_CONFIG:0:20}..."
           
           # Replace in file
-          npx replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" index.html
+          npx replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" assets/js/scripts.js
           
           # Verify
-          if grep -q "$FIREBASE_CONFIG" index.html; then
+          if grep -q "$FIREBASE_CONFIG" assets/js/scripts.js; then
             echo "Config injected successfully"
           else
             echo "::error::Injection failed - placeholder not found"
             echo "Current file content:"
-            head -n 20 index.html
+            head -n 20 assets/js/scripts.js
             exit 1
           fi
           
