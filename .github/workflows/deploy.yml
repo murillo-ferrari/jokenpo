@@ -19,48 +19,41 @@ jobs:
         with:
           node-version: '20'
           
-      - name: Install dependencies
+      - name: Install replace-in-file
         run: npm install -g replace-in-file
         
       - name: Inject Firebase config
         run: |
-          # Generate perfect JSON with jq
-          FIREBASE_JSON=$(jq -n \
-            --arg apiKey "${{ secrets.FIREBASE_API_KEY }}" \
-            --arg authDomain "${{ secrets.FIREBASE_AUTH_DOMAIN }}" \
-            --arg databaseURL "${{ secrets.FIREBASE_DATABASE_URL }}" \
-            --arg projectId "${{ secrets.FIREBASE_PROJECT_ID }}" \
-            --arg storageBucket "${{ secrets.FIREBASE_STORAGE_BUCKET }}" \
-            --arg messagingSenderId "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}" \
-            --arg appId "${{ secrets.FIREBASE_APP_ID }}" \
-            '{
-              apiKey: $apiKey,
-              authDomain: $authDomain,
-              databaseURL: $databaseURL,
-              projectId: $projectId,
-              storageBucket: $storageBucket,
-              messagingSenderId: $messagingSenderId,
-              appId: $appId
-            }')
+          # Create the JSON config
+          CONFIG_JSON=$(cat <<EOF
+          {
+            "apiKey": "${{ secrets.FIREBASE_API_KEY }}",
+            "authDomain": "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
+            "databaseURL": "${{ secrets.FIREBASE_DATABASE_URL }}",
+            "projectId": "${{ secrets.FIREBASE_PROJECT_ID }}",
+            "storageBucket": "${{ secrets.FIREBASE_STORAGE_BUCKET }}",
+            "messagingSenderId": "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}",
+            "appId": "${{ secrets.FIREBASE_APP_ID }}"
+          }
+          EOF
+          )
           
-          # Create clean base64 (remove all whitespace)
-          FIREBASE_CONFIG=$(echo -n "$FIREBASE_JSON" | base64 -w 0 | tr -d '\n')
+          # Convert to base64
+          FIREBASE_CONFIG=$(echo -n "$CONFIG_JSON" | base64 -w 0)
           
-          # Verify base64 is valid
-          if ! echo "$FIREBASE_CONFIG" | base64 -d > /dev/null 2>&1; then
-            echo "::error::Invalid base64 generated"
-            exit 1
-          fi
+          # Debug output (shows first 20 chars only)
+          echo "Config prefix: ${FIREBASE_CONFIG:0:20}..."
           
-          # Replace in file and verify
+          # Replace placeholder
           replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" index.html
           
+          # Verify replacement
           if ! grep -q "$FIREBASE_CONFIG" index.html; then
             echo "::error::Config injection failed"
             exit 1
           fi
           
-          echo "Config injected successfully"
+          echo "Firebase config injected successfully"
           
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
