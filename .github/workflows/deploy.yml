@@ -19,12 +19,21 @@ jobs:
         with:
           node-version: '20'
           
-      - name: Install replace-in-file
-        run: npm install -g replace-in-file
+      - name: Install dependencies
+        run: npm install -g replace-in-file jq
         
-      - name: Inject Firebase config
+      - name: Validate Secrets
         run: |
-          # Create valid JSON with proper escaping
+          echo "Checking secrets existence..."
+          if [ -z "${{ secrets.FIREBASE_API_KEY }}" ]; then
+            echo "::error::FIREBASE_API_KEY is empty"
+            exit 1
+          fi
+          echo "All secrets exist"
+          
+      - name: Generate and Inject Config
+        run: |
+          # Generate proper JSON with jq
           CONFIG_JSON=$(jq -n \
             --arg apiKey "${{ secrets.FIREBASE_API_KEY }}" \
             --arg authDomain "${{ secrets.FIREBASE_AUTH_DOMAIN }}" \
@@ -43,9 +52,21 @@ jobs:
               appId: $appId
             }')
           
-          echo "Generated config JSON: $CONFIG_JSON"
+          echo "Generated config (redacted): ${CONFIG_JSON:0:50}..."
+          
+          # Convert to base64
           FIREBASE_CONFIG=$(echo -n "$CONFIG_JSON" | base64 -w 0)
+          
+          # Replace placeholder
           replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" index.html
+          
+          # Verify replacement
+          if ! grep -q "$FIREBASE_CONFIG" index.html; then
+            echo "::error::Config injection failed"
+            exit 1
+          fi
+          
+          echo "Config injected successfully"
           
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
