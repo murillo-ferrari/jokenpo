@@ -22,7 +22,8 @@ const elements = {
   opponentChoice: document.getElementById("opponent-choice"),
   result: document.getElementById("result"),
   playerScore: document.getElementById("player-score"),
-  opponentScore: document.getElementById("opponent-score")
+  opponentScore: document.getElementById("opponent-score"),
+  resetConfirm: document.getElementById("reset-confirm")
 };
 
 // Emoji Mapping
@@ -48,6 +49,7 @@ function joinRoom() {
 
   elements.setup.style.display = "none";
   elements.waiting.style.display = "block";
+  elements.resetConfirm.style.display = "none";
 
   roomRef = database.ref(`rooms/${roomId}`);
 
@@ -68,6 +70,7 @@ function joinRoom() {
         },
         round: 0,
         scores: { player1: 0, player2: 0 },
+        resetRequest: null,
         lastUpdated: firebase.database.ServerValue.TIMESTAMP
       };
     } else {
@@ -102,6 +105,7 @@ function handleRoomError(error) {
   console.error("Room error:", error);
   elements.setup.style.display = "block";
   elements.waiting.style.display = "none";
+  elements.game.style.display = "none";
   alert(error.message || "Error joining room. Please try again.");
 }
 
@@ -128,6 +132,17 @@ function setupRoomListener() {
       // Update moves display
       updateMoveDisplay(room);
 
+      // Handle reset requests
+      if (room.resetRequest) {
+        if (room.resetRequest.playerId !== playerId) {
+          elements.resetConfirm.style.display = "block";
+        } else {
+          elements.resetConfirm.style.display = "none";
+        }
+      } else {
+        elements.resetConfirm.style.display = "none";
+      }
+
       // Handle completed round
       if (room.player1.move && room.player2.move && room.round > currentRound) {
         currentRound = room.round;
@@ -150,7 +165,7 @@ function updateScores() {
   elements.opponentScore.textContent = opponentScore;
 }
 
-// Game Actions - THIS IS THE FIXED FUNCTION
+// Game Actions
 function playMove(move) {
   const movePath = isPlayer1 ? "player1/move" : "player2/move";
   
@@ -219,7 +234,52 @@ function showResults(p1Move, p2Move) {
   }, 3000);
 }
 
+// Reset Functions
+function requestReset() {
+  roomRef.update({
+    resetRequest: {
+      playerId: playerId,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    },
+    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+  });
+}
+
+function confirmReset(accept) {
+  if (accept) {
+    // Reset scores
+    playerScore = 0;
+    opponentScore = 0;
+    updateScores();
+    
+    // Update database
+    roomRef.update({
+      scores: { player1: 0, player2: 0 },
+      resetRequest: null,
+      "player1/move": null,
+      "player2/move": null,
+      round: 0,
+      lastUpdated: firebase.database.ServerValue.TIMESTAMP
+    });
+    
+    // Reset UI
+    elements.result.textContent = "";
+    elements.playerChoice.textContent = "?";
+    elements.opponentChoice.textContent = "?";
+    currentRound = 0;
+  } else {
+    // Just clear the reset request
+    roomRef.update({
+      resetRequest: null,
+      lastUpdated: firebase.database.ServerValue.TIMESTAMP
+    });
+  }
+  elements.resetConfirm.style.display = "none";
+}
+
 // Expose functions to HTML
 window.createRoom = createRoom;
 window.joinRoom = joinRoom;
 window.playMove = playMove;
+window.requestReset = requestReset;
+window.confirmReset = confirmReset;
