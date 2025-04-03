@@ -1,75 +1,39 @@
-/**
- * Jokenpo (Rock-Paper-Scissors) Online Game
- *
- * This script implements a multiplayer Jokenpo game using Firebase Realtime Database.
- * Players can create rooms, join existing rooms, and play against each other in real-time.
- */
-
-/* ==================== FIREBASE INITIALIZATION ==================== */
-
-/**
- * Firebase configuration and initialization
- * Note: @@FIREBASE_CONFIG@@ should be replaced with your actual Firebase config
- * encoded in base64 during deployment
- */
+// Firebase Initialization
 const firebaseConfig = JSON.parse(atob("@@FIREBASE_CONFIG@@"));
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-/* ==================== GAME STATE VARIABLES ==================== */
-
-// Current room ID (4-character uppercase string)
+// Game State Variables
 let roomId;
-
-// Unique player ID (randomly generated)
 let playerId = "player_" + Math.random().toString(36).slice(2, 11);
-
-// Flag indicating if this player is the room creator
-let isRoomCreator = false;
-
-// Reference to the current room in Firebase
+let isPlayer1 = false;
 let roomRef;
-
-// Current round number
 let currentRound = 0;
-
-// Player and opponent scores
 let playerScore = 0;
 let opponentScore = 0;
-
-// Flag to track if buttons should be disabled
 let buttonsDisabled = false;
 
-/* ==================== DOM ELEMENTS ==================== */
-
-/**
- * Object containing references to all required DOM elements
- */
+// DOM Elements
 const elements = {
-  setup: document.getElementById("setup"), // Setup screen
-  waiting: document.getElementById("waiting"), // Waiting for player screen
-  shareRoom: document.getElementById("share-room"), // Room sharing section
-  roomIdDisplay: document.getElementById("room-id-display"), // Room ID display
-  copyBtn: document.getElementById("copy-btn"), // Copy room ID button
-  game: document.getElementById("game"), // Game screen
-  roomIdInput: document.getElementById("roomId"), // Room ID input field
-  playerChoice: document.getElementById("player-choice"), // Player's choice display
-  opponentChoice: document.getElementById("opponent-choice"), // Opponent's choice display
-  result: document.getElementById("result"), // Result display
-  playerScore: document.getElementById("player-score"), // Player score display
-  opponentScore: document.getElementById("opponent-score"), // Opponent score display
-  resetConfirm: document.getElementById("reset-confirm"), // Reset confirmation dialog
-  rockBtn: document.getElementById("rock-btn"), // Rock button
-  paperBtn: document.getElementById("paper-btn"), // Paper button
-  scissorsBtn: document.getElementById("scissors-btn"), // Scissors button
+  setup: document.getElementById("setup"),
+  waiting: document.getElementById("waiting"),
+  shareRoom: document.getElementById("share-room"),
+  roomIdDisplay: document.getElementById("room-id-display"),
+  copyBtn: document.getElementById("copy-btn"),
+  game: document.getElementById("game"),
+  roomIdInput: document.getElementById("roomId"),
+  playerChoice: document.getElementById("player-choice"),
+  opponentChoice: document.getElementById("opponent-choice"),
+  result: document.getElementById("result"),
+  playerScore: document.getElementById("player-score"),
+  opponentScore: document.getElementById("opponent-score"),
+  resetConfirm: document.getElementById("reset-confirm"),
+  rockBtn: document.getElementById("rock-btn"),
+  paperBtn: document.getElementById("paper-btn"),
+  scissorsBtn: document.getElementById("scissors-btn"),
 };
 
-/* ==================== UTILITY FUNCTIONS ==================== */
-
-/**
- * Verifies that all required DOM elements exist
- * @returns {boolean} True if all elements exist, false otherwise
- */
+// Verify all required DOM elements exist
 function verifyElements() {
   for (const [key, element] of Object.entries(elements)) {
     if (!element) {
@@ -80,27 +44,20 @@ function verifyElements() {
   return true;
 }
 
-// Verify elements on load and show alert if any are missing
 if (!verifyElements()) {
   alert(
     "Critical error: Missing required game elements. Please refresh the page."
   );
 }
 
-/**
- * Emoji mapping for game choices
- */
+// Emoji Mapping
 const emojis = {
   rock: "✊",
   paper: "✋",
   scissors: "✌️",
 };
 
-/* ==================== GAME INITIALIZATION ==================== */
-
-/**
- * Initializes button event listeners
- */
+// Initialize button event listeners
 function initializeButtons() {
   if (elements.rockBtn) {
     elements.rockBtn.addEventListener("click", () => playMove("rock"));
@@ -119,11 +76,7 @@ function initializeButtons() {
 // Initialize buttons when the script loads
 initializeButtons();
 
-/* ==================== ROOM MANAGEMENT ==================== */
-
-/**
- * Copies the current room ID to clipboard
- */
+// Allow users to copy room ID
 function copyRoomId() {
   navigator.clipboard
     .writeText(roomId)
@@ -131,30 +84,23 @@ function copyRoomId() {
       elements.copyBtn.textContent = "Copied!";
       setTimeout(() => {
         elements.copyBtn.textContent = "Copy Room ID";
-      }, 1000);
+      }, 2000);
     })
     .catch((err) => {
       console.error("Failed to copy room ID: ", err);
     });
 }
 
-/**
- * Creates a new game room with a random ID
- */
+// Room Management
 function createRoom() {
-  // Generate a 4-character room ID
   roomId = Math.random().toString(36).slice(2, 6).toUpperCase();
   elements.roomIdInput.value = roomId;
-  
-  // Show the room ID display for sharing
+  // Show the room ID display
   elements.shareRoom.style.display = "block";
   elements.roomIdDisplay.textContent = roomId;
   joinRoom();
 }
 
-/**
- * Joins an existing game room or creates one if it doesn't exist
- */
 function joinRoom() {
   roomId = elements.roomIdInput.value.trim().toUpperCase();
   if (!roomId || roomId.length !== 4) {
@@ -162,26 +108,20 @@ function joinRoom() {
     return;
   }
 
-  // Update UI state
   elements.setup.style.display = "none";
   elements.waiting.style.display = "block";
   elements.resetConfirm.style.display = "none";
-  elements.shareRoom.style.display = "none"; // Hide share section initially
+  elements.shareRoom.style.display = "none"; // Ensure share section is hidden initially
 
-  // Get reference to the room in Firebase
   roomRef = database.ref(`rooms/${roomId}`);
 
-  // Transaction ensures atomic updates to room state
   roomRef.transaction(
     (currentData) => {
-      // If room doesn't exist, create it (player becomes room creator)
       if (!currentData) {
-        isRoomCreator = true;
-        
-        // Show share section for room creator
+        isPlayer1 = true;
+        // Show share room section only for the room creator
         elements.shareRoom.style.display = "block";
         elements.roomIdDisplay.textContent = roomId;
-        
         return {
           player1: {
             id: playerId,
@@ -200,25 +140,20 @@ function joinRoom() {
         };
       }
 
-      // If room already has 2 players, throw error
       if (currentData.player2 && currentData.player2.id) {
         throw new Error("Room is full! Please try another room.");
       }
 
-      // If player is already in the room (player1)
       if (currentData.player1.id === playerId) {
-        isRoomCreator = true;
-        return; // No changes needed
+        isPlayer1 = true;
+        return;
       }
 
-      // Otherwise, join as player2
       currentData.player2 = {
         id: playerId,
         move: null,
         timestamp: firebase.database.ServerValue.TIMESTAMP,
       };
-      // Hide share section for room creator
-      elements.shareRoom.style.display = "none";
       currentData.lastUpdated = firebase.database.ServerValue.TIMESTAMP;
       return currentData;
     },
@@ -233,31 +168,20 @@ function joinRoom() {
         return;
       }
 
-      // Successfully joined room, set up listener
       setupRoomListener();
     }
   );
 }
 
-/**
- * Handles room joining errors
- * @param {Error} error The error that occurred
- */
 function handleRoomError(error) {
   console.error("Room error:", error);
-  // Reset UI to setup screen
   elements.setup.style.display = "block";
   elements.waiting.style.display = "none";
   elements.game.style.display = "none";
-  elements.shareRoom.style.display = "none";
   alert(error.message || "Error joining room. Please try again.");
 }
 
-/* ==================== GAME STATE MANAGEMENT ==================== */
-
-/**
- * Sets up a listener for changes to the room state in Firebase
- */
+// Game State Management
 function setupRoomListener() {
   roomRef.on("value", (snapshot) => {
     try {
@@ -268,7 +192,6 @@ function setupRoomListener() {
         return;
       }
 
-      // If room isn't full yet, wait for second player
       if (!room.player1 || !room.player2 || !room.player2.id) {
         return;
       }
@@ -276,13 +199,12 @@ function setupRoomListener() {
       // Hide share room section when room is full
       elements.shareRoom.style.display = "none";
 
-      // Show game screen
       elements.waiting.style.display = "none";
       elements.game.style.display = "block";
 
-      // Update scores from Firebase
-      playerScore = isRoomCreator ? room.scores.player1 : room.scores.player2;
-      opponentScore = isRoomCreator ? room.scores.player2 : room.scores.player1;
+      // Update scores
+      playerScore = isPlayer1 ? room.scores.player1 : room.scores.player2;
+      opponentScore = isPlayer1 ? room.scores.player2 : room.scores.player1;
       updateScores();
 
       // Handle reset requests
@@ -297,8 +219,8 @@ function setupRoomListener() {
       }
 
       // Get current player moves
-      const myMove = isRoomCreator ? room.player1.move : room.player2.move;
-      const theirMove = isRoomCreator ? room.player2.move : room.player1.move;
+      const myMove = isPlayer1 ? room.player1.move : room.player2.move;
+      const theirMove = isPlayer1 ? room.player2.move : room.player1.move;
 
       // Update UI based on game state
       if (room.player1.move && room.player2.move) {
@@ -328,18 +250,11 @@ function setupRoomListener() {
   });
 }
 
-/**
- * Updates the state of the game buttons based on current moves
- * @param {string|null} myMove The current player's move (or null if none)
- * @param {string|null} theirMove The opponent's move (or null if none)
- */
 function updateButtonState(myMove, theirMove) {
   try {
-    // Only disable buttons if current player has made a move
-    const shouldDisable = !!myMove;
+    const shouldDisable = !!myMove; // Only disable if current player has moved
     setButtonsDisabled(shouldDisable);
 
-    // Update visual state of buttons
     const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
     buttons.forEach((btn) => {
       if (!btn) return;
@@ -357,10 +272,6 @@ function updateButtonState(myMove, theirMove) {
   }
 }
 
-/**
- * Enables or disables all game buttons
- * @param {boolean} disabled Whether buttons should be disabled
- */
 function setButtonsDisabled(disabled) {
   buttonsDisabled = disabled;
   if (elements.rockBtn) elements.rockBtn.disabled = disabled;
@@ -368,12 +279,7 @@ function setButtonsDisabled(disabled) {
   if (elements.scissorsBtn) elements.scissorsBtn.disabled = disabled;
 }
 
-/* ==================== GAME ACTIONS ==================== */
-
-/**
- * Handles a player making a move (rock, paper, or scissors)
- * @param {string} move The move being played ("rock", "paper", or "scissors")
- */
+// Game Actions
 function playMove(move) {
   if (buttonsDisabled) {
     console.log("Buttons are disabled - ignoring move");
@@ -401,7 +307,6 @@ function playMove(move) {
         return;
       }
 
-      // Prepare updates for Firebase
       const updates = {};
       const playerPath = isStillPlayer1 ? "player1" : "player2";
       updates[`${playerPath}/move`] = move;
@@ -438,15 +343,10 @@ function playMove(move) {
     });
 }
 
-/**
- * Calculates and displays the results of a round
- * @param {string} p1Move Player 1's move
- * @param {string} p2Move Player 2's move
- */
 function calculateResults(p1Move, p2Move) {
-  // Display moves using emojis
-  elements.playerChoice.textContent = emojis[isRoomCreator ? p1Move : p2Move];
-  elements.opponentChoice.textContent = emojis[isRoomCreator ? p2Move : p1Move];
+  // Display moves
+  elements.playerChoice.textContent = emojis[isPlayer1 ? p1Move : p2Move];
+  elements.opponentChoice.textContent = emojis[isPlayer1 ? p2Move : p1Move];
 
   // Determine winner
   let result = "It's a tie!";
@@ -458,12 +358,12 @@ function calculateResults(p1Move, p2Move) {
     };
 
     if (winConditions[p1Move] === p2Move) {
-      result = isRoomCreator ? "You win! 🎉" : "Opponent wins!";
-      if (isRoomCreator) playerScore++;
+      result = isPlayer1 ? "You win! 🎉" : "Opponent wins!";
+      if (isPlayer1) playerScore++;
       else opponentScore++;
     } else {
-      result = isRoomCreator ? "Opponent wins!" : "You win! 🎉";
-      if (!isRoomCreator) playerScore++;
+      result = isPlayer1 ? "Opponent wins!" : "You win! 🎉";
+      if (!isPlayer1) playerScore++;
       else opponentScore++;
     }
   }
@@ -474,13 +374,13 @@ function calculateResults(p1Move, p2Move) {
   // Update scores in database
   roomRef.update({
     scores: {
-      player1: isRoomCreator ? playerScore : opponentScore,
-      player2: isRoomCreator ? opponentScore : playerScore,
+      player1: isPlayer1 ? playerScore : opponentScore,
+      player2: isPlayer1 ? opponentScore : playerScore,
     },
     lastUpdated: firebase.database.ServerValue.TIMESTAMP,
   });
 
-  // Reset for next round after 3 seconds
+  // Reset for next round
   setTimeout(() => {
     roomRef.update({
       "player1/move": null,
@@ -497,20 +397,13 @@ function calculateResults(p1Move, p2Move) {
   }, 3000);
 }
 
-/**
- * Updates the score displays in the UI
- */
 function updateScores() {
   if (elements.playerScore) elements.playerScore.textContent = playerScore;
   if (elements.opponentScore)
     elements.opponentScore.textContent = opponentScore;
 }
 
-/* ==================== GAME RESET FUNCTIONS ==================== */
-
-/**
- * Requests a score reset (needs confirmation from other player)
- */
+// Reset Functions
 function requestReset() {
   roomRef.update({
     resetRequest: {
@@ -521,10 +414,6 @@ function requestReset() {
   });
 }
 
-/**
- * Confirms or rejects a reset request
- * @param {boolean} accept Whether to accept the reset request
- */
 function confirmReset(accept) {
   if (accept) {
     playerScore = 0;
@@ -548,7 +437,6 @@ function confirmReset(accept) {
     return;
   }
 
-  // If reset was rejected
   roomRef.update({
     resetRequest: null,
     lastUpdated: firebase.database.ServerValue.TIMESTAMP,
@@ -556,9 +444,7 @@ function confirmReset(accept) {
   elements.resetConfirm.style.display = "none";
 }
 
-/* ==================== EXPOSE FUNCTIONS TO HTML ==================== */
-
-// Make these functions available to be called from HTML
+// Expose functions to HTML
 window.createRoom = createRoom;
 window.joinRoom = joinRoom;
 window.playMove = playMove;
