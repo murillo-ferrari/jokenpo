@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Online Jokenpo</title>
-    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="assets\css\styles.css">
 
     <!-- Load Firebase FIRST -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
@@ -21,8 +21,8 @@
 
     <div id="setup">
         <input type="text" id="roomId" placeholder="Enter Room ID">
-        <button id="joinRoomBtn">Join Room</button>
-        <button id="createRoomBtn">Create Room</button>
+        <button onclick="joinRoom()">Join Room</button>
+        <button onclick="createRoom()" style="background:#0F9D58">Create New Room</button>
     </div>
 
     <div id="waiting">Waiting for opponent to join...</div>
@@ -30,31 +30,33 @@
     <div id="game">
         <h2>Make your move:</h2>
         <div>
-            <button id="rock-btn">✊ Rock</button>
-            <button id="paper-btn">✋ Paper</button>
-            <button id="scissors-btn">✌️ Scissors</button>
+            <button onclick="playMove('rock')">✊ Rock</button>
+            <button onclick="playMove('paper')">✋ Paper</button>
+            <button onclick="playMove('scissors')">✌️ Scissors</button>
         </div>
 
         <div class="choice-display">
             <span id="player-choice">?</span>
-            <span class="vs-text">vs</span>
+            <span style="font-size:24px">vs</span>
             <span id="opponent-choice">?</span>
         </div>
 
         <div id="result"></div>
 
         <div class="scores">
-            <span class="player-score">You: <span id="player-score">0</span></span> |
-            <span class="opponent-score">Opponent: <span id="opponent-score">0</span></span>
+            <span style="color:#4285F4">You: <span id="player-score">0</span></span> |
+            <span style="color:#DB4437">Opponent: <span id="opponent-score">0</span></span>
         </div>
 
-        <button id="reset-btn">Reset Game</button>
-        <div id="reset-confirm">
+        <button onclick="requestReset()" style="background:#DB4437; margin-top:30px">Reset Game</button>
+        <div id="reset-confirm"
+            style="display:none; margin-top:10px; padding:10px; background:#f0f0f0; border-radius:5px;">
             <p>Opponent wants to reset. Accept?</p>
-            <button id="confirm-reset-btn">Yes</button>
-            <button id="deny-reset-btn">No</button>
+            <button onclick="confirmReset(true)" style="background:#0F9D58; margin-right:10px;">Yes</button>
+            <button onclick="confirmReset(false)" style="background:#DB4437">No</button>
         </div>
     </div>
+
 </body>
 
 </html>

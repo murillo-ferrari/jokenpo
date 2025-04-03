@@ -15,18 +15,9 @@ let buttonsDisabled = false;
  */
 export function setButtonsDisabled(disabled) {
   buttonsDisabled = disabled;
-  if (elements.rockBtn) {
-      elements.rockBtn.disabled = disabled;
-      console.log(`Rock button disabled: ${disabled}`); // Debug log
-  }
-  if (elements.paperBtn) {
-      elements.paperBtn.disabled = disabled;
-      console.log(`Paper button disabled: ${disabled}`); // Debug log
-  }
-  if (elements.scissorsBtn) {
-      elements.scissorsBtn.disabled = disabled;
-      console.log(`Scissors button disabled: ${disabled}`); // Debug log
-  }
+  if (elements.rockBtn) elements.rockBtn.disabled = disabled;
+  if (elements.paperBtn) elements.paperBtn.disabled = disabled;
+  if (elements.scissorsBtn) elements.scissorsBtn.disabled = disabled;
 }
 
 /**
@@ -35,15 +26,23 @@ export function setButtonsDisabled(disabled) {
  * @param {string|null} theirMove - Opponent's move
  */
 export function updateButtonState(myMove, theirMove) {
-  const shouldDisable = !!myMove; // Only disable if player has made a move
+  const shouldDisable = myMove || (myMove && theirMove);
   setButtonsDisabled(shouldDisable);
 
   const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
   buttons.forEach((btn) => {
-      if (!btn) return;
-      
-      btn.style.opacity = shouldDisable ? "0.5" : "1";
-      btn.style.cursor = shouldDisable ? "not-allowed" : "pointer";
+    if (!btn) return;
+
+    if (myMove && !theirMove) {
+      btn.style.opacity = "0.5";
+      btn.style.cursor = "not-allowed";
+    } else if (myMove && theirMove) {
+      btn.style.opacity = "0.5";
+      btn.style.cursor = "wait";
+    } else {
+      btn.style.opacity = "1";
+      btn.style.cursor = "pointer";
+    }
   });
 }
 
@@ -54,30 +53,16 @@ export function setupRoomListener() {
   const roomRef = getRoomRef(roomId);
 
   roomRef.on("value", (snapshot) => {
-    try {
-      const room = snapshot.val();
-      if (!room) {
-        elements.waiting.style.display = "none";
-        elements.game.style.display = "none";
-        elements.setup.style.display = "block";
-        alert("Room no longer exists");
-        return;
-      }
+    const room = snapshot.val();
+    if (!room) return;
 
-      if (!room.player1?.id || !room.player2?.id) {
-        elements.waiting.style.display = "block";
-        elements.game.style.display = "none";
-        return;
-      }
+    if (!room.player1?.id || !room.player2?.id) return;
 
-      // Update game UI
-      updateGameUI(room);
+    // Update game UI
+    updateGameUI(room);
 
-      // Handle moves and results
-      handleGameProgress(room);
-    } catch (error) {
-      console.error("Room listener error:", error);
-    }
+    // Handle moves and results
+    handleGameProgress(room);
   });
 }
 
@@ -143,18 +128,4 @@ export function confirmReset(accept) {
     });
   }
   elements.resetConfirm.style.display = "none";
-}
-
-/**
- * Request a game reset
- */
-export function requestReset() {
-  const roomRef = getRoomRef(roomId);
-  roomRef.update({
-    resetRequest: {
-      playerId: playerId,
-      timestamp: firebase.database.ServerValue.TIMESTAMP,
-    },
-    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
-  });
 }
