@@ -1,48 +1,33 @@
-// In main.js, update the initialization code:
+/**
+ * Main application entry point
+ * Initializes the game and connects all modules
+ */
+
+import { initPlayer } from "./core/game-state.js";
+import { verifyDOM } from "./core/dom-manager.js";
+import { createRoom, joinRoom } from "./features/room-manager.js";
+import { playMove } from "./features/game-logic.js";
+import { confirmReset, requestReset } from "./features/ui-controller.js";
+
+// Initialize game
 function initGame() {
   try {
     verifyDOM();
     initPlayer();
 
-    // Create game object
-    const game = {
-      createRoom: RoomManager.createRoom,
-      joinRoom: RoomManager.joinRoom,
-      playMove: GameLogic.playMove,
-      requestReset: UIController.requestReset,
-      confirmReset: UIController.confirmReset,
-    };
-
-    // Make game object available globally for debugging
-    window.game = game;
-
-    // Add event listeners - make sure elements exist first
-    if (elements.createRoomBtn) {
-      elements.createRoomBtn.addEventListener("click", game.createRoom);
-    }
-
-    if (elements.joinRoomBtn) {
-      elements.joinRoomBtn.addEventListener("click", game.joinRoom);
-    }
-
-    // Add game button listeners - IMPORTANT: Use the correct IDs
-    if (elements.rockBtn) {
-      elements.rockBtn.addEventListener("click", () => game.playMove("rock"));
-      console.log("Rock button listener added"); // Debug log
-    }
-    if (elements.paperBtn) {
-      elements.paperBtn.addEventListener("click", () => game.playMove("paper"));
-      console.log("Paper button listener added"); // Debug log
-    }
-    if (elements.scissorsBtn) {
-      elements.scissorsBtn.addEventListener("click", () =>
-        game.playMove("scissors")
-      );
-      console.log("Scissors button listener added"); // Debug log
-    }
+    // Expose functions to global scope for HTML access
+    window.createRoom = createRoom;
+    window.joinRoom = joinRoom;
+    window.playMove = playMove;
+    window.requestReset = requestReset;
+    window.confirmReset = confirmReset;
 
     console.log("Game initialized successfully");
   } catch (error) {
     console.error("Initialization error:", error);
+    alert("Failed to initialize game. Please refresh the page.");
   }
 }
+
+// Start the game when DOM is loaded
+document.addEventListener("DOMContentLoaded", initGame);
