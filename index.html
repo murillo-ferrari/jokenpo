@@ -1,62 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Online Jokenpo</title>
-    <link rel="stylesheet" href="assets/css/styles.css">
+    <title>Jokenpo Online</title>
+
+    <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-    <div id="firebase-error"></div>
-    <h1>🎮 Online Jokenpo</h1>
-
-    <div id="setup">
-        <input type="text" id="roomId" placeholder="Enter Room ID">
-        <button onclick="joinRoom()">Join Room</button>
-        <button onclick="createRoom()" style="background:#0F9D58">Create New Room</button>
-    </div>
-
-    <div id="waiting">Waiting for opponent to join...</div>
-
-    <div id="game">
-        <h2>Make your move:</h2>
+    <h1>✊✋✌️ Online Jokenpo</h1>
+    
+    <!-- Setup Section -->
+    <div id="setup" class="section">
+        <button onclick="createRoom()">Create Room</button>
         <div>
-            <button id="rock-btn" onclick="playMove('rock')">✊ Rock</button>
-            <button id="paper-btn" onclick="playMove('paper')">✋ Paper</button>
-            <button id="scissors-btn" onclick="playMove('scissors')">✌️ Scissors</button>
-        </div>
-
-        <div class="choice-display">
-            <span id="player-choice">?</span>
-            <span style="font-size:24px">vs</span>
-            <span id="opponent-choice">?</span>
-        </div>
-
-        <div id="result"></div>
-
-        <div class="scores">
-            <span style="color:#4285F4">You: <span id="player-score">0</span></span> |
-            <span style="color:#DB4437">Opponent: <span id="opponent-score">0</span></span>
-        </div>
-
-        <button onclick="requestReset()" style="background:#DB4437; margin-top:30px">Reset Game</button>
-        <div id="reset-confirm"
-            style="display:none; margin-top:10px; padding:10px; background:#f0f0f0; border-radius:5px;">
-            <p>Opponent wants to reset. Accept?</p>
-            <button onclick="confirmReset(true)" style="background:#0F9D58; margin-right:10px;">Yes</button>
-            <button onclick="confirmReset(false)" style="background:#DB4437">No</button>
+            <p>or join an existing room:</p>
+            <input type="text" id="roomId" placeholder="Enter Room ID" maxlength="4">
+            <button onclick="joinRoom()">Join Room</button>
         </div>
     </div>
-
+    
+    <!-- Share Room Section -->
+    <div id="share-room">
+        <p>Share this room ID with a friend:</p>
+        <div id="room-id-display"></div>
+        <button id="copy-btn" onclick="copyRoomId()">Copy Room ID</button>
+    </div>
+    
+    <!-- Waiting Section -->
+    <div id="waiting" class="section">
+        <p>Waiting for another player to join...</p>
+    </div>
+    
+    <!-- Game Section -->
+    <div id="game" class="section">
+        <div>
+            <span>You: </span>
+            <span id="player-score">0</span>
+            <span> vs </span>
+            <span id="opponent-score">0</span>
+            <span> Opponent</span>
+        </div>
+        
+        <div id="player-choice" class="choice-display">?</div>
+        <div id="opponent-choice" class="choice-display">?</div>
+        
+        <div id="result"></div>
+        
+        <button id="rock-btn">✊ Rock</button>
+        <button id="paper-btn">✋ Paper</button>
+        <button id="scissors-btn">✌️ Scissors</button>
+        
+        <div id="reset-confirm">
+            <p>Opponent wants to reset scores. Accept?</p>
+            <button onclick="confirmReset(true)">Yes</button>
+            <button onclick="confirmReset(false)">No</button>
+        </div>
+        
+        <div class="reset-container">
+            <button onclick="requestReset()">Reset Scores</button>
+        </div>
+    </div>
 
     <!-- Load Firebase FIRST -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
-
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
     <!-- Game Logic -->
-    <script src="assets/js/scripts.js"></script>
+    <script src="script.js"></script>
 </body>
-
 </html>

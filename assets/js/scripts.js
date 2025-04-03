@@ -16,6 +16,8 @@ let buttonsDisabled = false;
 // DOM Elements
 const elements = {
   setup: document.getElementById("setup"),
+  shareRoom: document.getElementById("share-room"),
+  roomIdDisplay: document.getElementById("room-id-display"),
   waiting: document.getElementById("waiting"),
   game: document.getElementById("game"),
   roomIdInput: document.getElementById("roomId"),
@@ -42,7 +44,9 @@ function verifyElements() {
 }
 
 if (!verifyElements()) {
-  alert("Critical error: Missing required game elements. Please refresh the page.");
+  alert(
+    "Critical error: Missing required game elements. Please refresh the page."
+  );
 }
 
 // Emoji Mapping
@@ -51,6 +55,38 @@ const emojis = {
   paper: "✋",
   scissors: "✌️",
 };
+
+// Initialize button event listeners
+function initializeButtons() {
+  if (elements.rockBtn) {
+    elements.rockBtn.addEventListener("click", () => playMove("rock"));
+    elements.rockBtn.disabled = false;
+  }
+  if (elements.paperBtn) {
+    elements.paperBtn.addEventListener("click", () => playMove("paper"));
+    elements.paperBtn.disabled = false;
+  }
+  if (elements.scissorsBtn) {
+    elements.scissorsBtn.addEventListener("click", () => playMove("scissors"));
+    elements.scissorsBtn.disabled = false;
+  }
+}
+
+// Initialize buttons when the script loads
+initializeButtons();
+
+// Copy Room ID to clipboard
+function copyRoomId() {
+  navigator.clipboard.writeText(roomId).then(() => {
+    const copyBtn = document.getElementById('copy-btn');
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => {
+      copyBtn.textContent = 'Copy Room ID';
+    }, 2000);
+  }).catch(err => {
+    console.error('Failed to copy room ID: ', err);
+  });
+}
 
 // Room Management
 function createRoom() {
@@ -69,6 +105,7 @@ function joinRoom() {
   elements.setup.style.display = "none";
   elements.waiting.style.display = "block";
   elements.resetConfirm.style.display = "none";
+  elements.shareRoom.style.display = "none";
 
   roomRef = database.ref(`rooms/${roomId}`);
 
@@ -76,6 +113,9 @@ function joinRoom() {
     (currentData) => {
       if (!currentData) {
         isPlayer1 = true;
+        // Show share room section only for the room creator
+        elements.shareRoom.style.display = "block";
+        elements.roomIdDisplay.textContent = roomId;
         return {
           player1: {
             id: playerId,
@@ -146,7 +186,7 @@ function setupRoomListener() {
         return;
       }
 
-      if (!room.player1 || !room.player2) {
+      if (!room.player1 || !room.player2 || !room.player2.id) {
         return;
       }
 
@@ -197,13 +237,13 @@ function setupRoomListener() {
 
 function updateButtonState(myMove, theirMove) {
   try {
-    const shouldDisable = myMove || !theirMove;
+    const shouldDisable = !!myMove || !roomRef;
     setButtonsDisabled(shouldDisable);
 
     const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
     buttons.forEach((btn) => {
       if (!btn) return;
-      
+
       if (myMove) {
         btn.style.opacity = "0.5";
         btn.style.cursor = "not-allowed";
@@ -226,44 +266,66 @@ function setButtonsDisabled(disabled) {
 
 // Game Actions
 function playMove(move) {
-  if (buttonsDisabled) return;
+  if (buttonsDisabled) {
+    console.log("Buttons are disabled - ignoring move");
+    return;
+  }
 
-  roomRef.once("value").then((snapshot) => {
-    const room = snapshot.val();
-    if (!room) return;
+  console.log(`Playing move: ${move}`);
 
-    const updates = {};
-    if (room.player1.id === playerId) {
-      updates["player1/move"] = move;
-      isPlayer1 = true;
-    } else if (room.player2.id === playerId) {
-      updates["player2/move"] = move;
-      isPlayer1 = false;
-    } else {
-      console.error("Player ID mismatch!");
-      return;
-    }
+  roomRef
+    .once("value")
+    .then((snapshot) => {
+      const room = snapshot.val();
+      if (!room) {
+        console.error("Room not found");
+        return;
+      }
 
-    updates["lastUpdated"] = firebase.database.ServerValue.TIMESTAMP;
+      // Verify player is still in the room
+      const isStillPlayer1 = room.player1 && room.player1.id === playerId;
+      const isStillPlayer2 = room.player2 && room.player2.id === playerId;
 
-    return roomRef.update(updates);
-  }).then(() => {
-    elements.playerChoice.textContent = "✓";
-    setButtonsDisabled(true);
+      if (!isStillPlayer1 && !isStillPlayer2) {
+        console.error("Player not found in room");
+        alert("You're no longer in this room. Please refresh.");
+        return;
+      }
 
-    // Check if both players have moved
-    return roomRef.once("value");
-  }).then(snapshot => {
-    const room = snapshot.val();
-    if (room.player1.move && room.player2.move && room.round === currentRound) {
-      return roomRef.update({
-        round: currentRound + 1,
-        lastUpdated: firebase.database.ServerValue.TIMESTAMP
-      });
-    }
-  }).catch(error => {
-    console.error("Move error:", error);
-  });
+      const updates = {};
+      const playerPath = isStillPlayer1 ? "player1" : "player2";
+      updates[`${playerPath}/move`] = move;
+      updates["lastUpdated"] = firebase.database.ServerValue.TIMESTAMP;
+
+      return roomRef.update(updates);
+    })
+    .then(() => {
+      console.log("Move submitted successfully");
+      elements.playerChoice.textContent = "✓";
+      setButtonsDisabled(true);
+
+      // Check if both players have moved
+      return roomRef.once("value");
+    })
+    .then((snapshot) => {
+      const room = snapshot.val();
+      if (
+        room.player1.move &&
+        room.player2.move &&
+        room.round === currentRound
+      ) {
+        console.log("Both players moved - advancing round");
+        return roomRef.update({
+          round: currentRound + 1,
+          lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+        });
+      }
+    })
+    .catch((error) => {
+      console.error("Move error:", error);
+      alert("Error submitting move. Please try again.");
+      setButtonsDisabled(false);
+    });
 }
 
 function calculateResults(p1Move, p2Move) {
@@ -277,7 +339,7 @@ function calculateResults(p1Move, p2Move) {
     const winConditions = {
       rock: "scissors",
       paper: "rock",
-      scissors: "paper"
+      scissors: "paper",
     };
 
     if (winConditions[p1Move] === p2Move) {
@@ -298,9 +360,9 @@ function calculateResults(p1Move, p2Move) {
   roomRef.update({
     scores: {
       player1: isPlayer1 ? playerScore : opponentScore,
-      player2: isPlayer1 ? opponentScore : playerScore
+      player2: isPlayer1 ? opponentScore : playerScore,
     },
-    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
   });
 
   // Reset for next round
@@ -308,7 +370,7 @@ function calculateResults(p1Move, p2Move) {
     roomRef.update({
       "player1/move": null,
       "player2/move": null,
-      lastUpdated: firebase.database.ServerValue.TIMESTAMP
+      lastUpdated: firebase.database.ServerValue.TIMESTAMP,
     });
     elements.result.textContent = "";
     elements.playerChoice.textContent = "?";
@@ -319,7 +381,8 @@ function calculateResults(p1Move, p2Move) {
 
 function updateScores() {
   if (elements.playerScore) elements.playerScore.textContent = playerScore;
-  if (elements.opponentScore) elements.opponentScore.textContent = opponentScore;
+  if (elements.opponentScore)
+    elements.opponentScore.textContent = opponentScore;
 }
 
 // Reset Functions
@@ -369,3 +432,4 @@ window.joinRoom = joinRoom;
 window.playMove = playMove;
 window.requestReset = requestReset;
 window.confirmReset = confirmReset;
+window.copyRoomId = copyRoomId;
