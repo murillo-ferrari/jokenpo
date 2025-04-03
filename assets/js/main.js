@@ -3,7 +3,7 @@
  */
 
 import { initPlayer } from './core/game-state.js';
-import { verifyDOM } from './core/dom-manager.js';
+import { verifyDOM, elements } from './core/dom-manager.js'; // Import elements
 import * as RoomManager from './features/room-manager.js';
 import * as GameLogic from './features/game-logic.js';
 import * as UIController from './features/ui-controller.js';
@@ -23,12 +23,22 @@ function initGame() {
       confirmReset: UIController.confirmReset
     };
     
-    // Make available globally
+    // Make available globally (optional)
     window.game = game;
     
-    // Add event listeners properly
-    document.getElementById('createRoomBtn')?.addEventListener('click', game.createRoom);
-    document.getElementById('joinRoomBtn')?.addEventListener('click', game.joinRoom);
+    // Add event listeners for room management
+    if (elements.createRoomBtn) {
+      elements.createRoomBtn.addEventListener('click', game.createRoom);
+    }
+    
+    if (elements.joinRoomBtn) {
+      elements.joinRoomBtn.addEventListener('click', game.joinRoom);
+    }
+    
+    // Add event listener for rock button if it exists
+    if (elements.rockBtn) {
+      elements.rockBtn.addEventListener('click', () => game.playMove('rock'));
+    }
     
     console.log("Game initialized successfully");
   } catch (error) {
