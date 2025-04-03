@@ -16,8 +16,6 @@ let buttonsDisabled = false;
 // DOM Elements
 const elements = {
   setup: document.getElementById("setup"),
-  shareRoom: document.getElementById("share-room"),
-  roomIdDisplay: document.getElementById("room-id-display"),
   waiting: document.getElementById("waiting"),
   game: document.getElementById("game"),
   roomIdInput: document.getElementById("roomId"),
@@ -75,19 +73,6 @@ function initializeButtons() {
 // Initialize buttons when the script loads
 initializeButtons();
 
-// Copy Room ID to clipboard
-function copyRoomId() {
-  navigator.clipboard.writeText(roomId).then(() => {
-    const copyBtn = document.getElementById('copy-btn');
-    copyBtn.textContent = 'Copied!';
-    setTimeout(() => {
-      copyBtn.textContent = 'Copy Room ID';
-    }, 2000);
-  }).catch(err => {
-    console.error('Failed to copy room ID: ', err);
-  });
-}
-
 // Room Management
 function createRoom() {
   roomId = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -105,7 +90,6 @@ function joinRoom() {
   elements.setup.style.display = "none";
   elements.waiting.style.display = "block";
   elements.resetConfirm.style.display = "none";
-  elements.shareRoom.style.display = "none";
 
   roomRef = database.ref(`rooms/${roomId}`);
 
@@ -113,9 +97,6 @@ function joinRoom() {
     (currentData) => {
       if (!currentData) {
         isPlayer1 = true;
-        // Show share room section only for the room creator
-        elements.shareRoom.style.display = "block";
-        elements.roomIdDisplay.textContent = roomId;
         return {
           player1: {
             id: playerId,
@@ -156,12 +137,12 @@ function joinRoom() {
         handleRoomError(error);
         return;
       }
-      
+
       if (!committed) {
         handleRoomError(new Error("Failed to join room"));
         return;
       }
-      
+
       setupRoomListener();
     }
   );
@@ -432,4 +413,3 @@ window.joinRoom = joinRoom;
 window.playMove = playMove;
 window.requestReset = requestReset;
 window.confirmReset = confirmReset;
-window.copyRoomId = copyRoomId;
