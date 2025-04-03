@@ -111,6 +111,7 @@ function joinRoom() {
   elements.setup.style.display = "none";
   elements.waiting.style.display = "block";
   elements.resetConfirm.style.display = "none";
+  elements.shareRoom.style.display = "none"; // Ensure share section is hidden initially
 
   roomRef = database.ref(`rooms/${roomId}`);
 
@@ -195,6 +196,9 @@ function setupRoomListener() {
         return;
       }
 
+      // Hide share room section when room is full
+      elements.shareRoom.style.display = "none";
+
       elements.waiting.style.display = "none";
       elements.game.style.display = "block";
 
@@ -224,12 +228,18 @@ function setupRoomListener() {
           currentRound = room.round;
           calculateResults(room.player1.move, room.player2.move);
         } else {
-          elements.result.textContent = "Calculating...";
+          // Only show "Calculating..." if we haven't processed the result yet
+          if (elements.result.textContent !== "It's a tie!") {
+            elements.result.textContent = "Calculating...";
+          }
         }
       } else {
         elements.playerChoice.textContent = myMove ? "✓" : "?";
         elements.opponentChoice.textContent = theirMove ? "✓" : "?";
-        elements.result.textContent = "";
+        // Only clear result if we're not showing a tie
+        if (elements.result.textContent !== "It's a tie!") {
+          elements.result.textContent = "";
+        }
       }
 
       // Update button states
@@ -242,7 +252,7 @@ function setupRoomListener() {
 
 function updateButtonState(myMove, theirMove) {
   try {
-    const shouldDisable = !!myMove || !roomRef;
+    const shouldDisable = !!myMove; // Only disable if current player has moved
     setButtonsDisabled(shouldDisable);
 
     const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
@@ -377,7 +387,10 @@ function calculateResults(p1Move, p2Move) {
       "player2/move": null,
       lastUpdated: firebase.database.ServerValue.TIMESTAMP,
     });
-    elements.result.textContent = "";
+    // Only clear these if we're not showing a tie
+    if (elements.result.textContent !== "It's a tie!") {
+      elements.result.textContent = "";
+    }
     elements.playerChoice.textContent = "?";
     elements.opponentChoice.textContent = "?";
     setButtonsDisabled(false);
