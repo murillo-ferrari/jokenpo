@@ -2,8 +2,8 @@
  * Main application entry point
  */
 
-import { initPlayer } from './core/game-state.js';
-import { verifyDOM, elements } from './core/dom-manager.js'; // Import elements
+import { initPlayer, getPlayerId } from './core/game-state.js';
+import { verifyDOM, elements } from './core/dom-manager.js';
 import * as RoomManager from './features/room-manager.js';
 import * as GameLogic from './features/game-logic.js';
 import * as UIController from './features/ui-controller.js';
@@ -12,7 +12,10 @@ import * as UIController from './features/ui-controller.js';
 function initGame() {
   try {
     verifyDOM();
-    initPlayer();
+    initPlayer(); // This will now work with generatePlayerId defined
+    
+    // Debug log to verify player ID was created
+    console.log('Player initialized with ID:', getPlayerId());
     
     // Create game object
     const game = {
@@ -23,10 +26,7 @@ function initGame() {
       confirmReset: UIController.confirmReset
     };
     
-    // Make available globally (optional)
-    window.game = game;
-    
-    // Add event listeners for room management
+    // Add event listeners
     if (elements.createRoomBtn) {
       elements.createRoomBtn.addEventListener('click', game.createRoom);
     }
@@ -35,16 +35,22 @@ function initGame() {
       elements.joinRoomBtn.addEventListener('click', game.joinRoom);
     }
     
-    // Add event listener for rock button if it exists
-    if (elements.rockBtn) {
-      elements.rockBtn.addEventListener('click', () => game.playMove('rock'));
-    }
+    // Add game control listeners if elements exist
+    if (elements.rockBtn) elements.rockBtn.addEventListener('click', () => game.playMove('rock'));
+    if (elements.paperBtn) elements.paperBtn.addEventListener('click', () => game.playMove('paper'));
+    if (elements.scissorsBtn) elements.scissorsBtn.addEventListener('click', () => game.playMove('scissors'));
     
     console.log("Game initialized successfully");
   } catch (error) {
     console.error("Initialization error:", error);
-    alert("Failed to initialize game. Please refresh the page.");
+    alert(`Game initialization failed: ${error.message}`);
+    // You might want to add more recovery options here
   }
 }
 
-document.addEventListener("DOMContentLoaded", initGame);
+// Start the game when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initGame);
+} else {
+  initGame(); // DOM is already ready
+}

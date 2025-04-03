@@ -1,32 +1,31 @@
 /**
- * Manages the game state and player information
+ * Core game state management
  */
 
-let roomId = null;
-let playerId = null;
-let isPlayer1 = false;
-let currentRound = 0;
-let playerScore = 0;
-let opponentScore = 0;
+// Generate a random player ID
+function generatePlayerId() {
+  return 'player-' + Math.random().toString(36).substr(2, 9);
+}
+
+// Game state variables
+export let roomId = null;
+export let playerId = null;
+export let isPlayer1 = false;
 
 /**
- * Initialize player with new ID
+ * Initialize player with unique ID
  */
-function initPlayer() {
-  playerId = generatePlayerId();
+export function initPlayer() {
+  playerId = generatePlayerId(); // Now this will work
+  localStorage.setItem('playerId', playerId); // Optional: persist across page refreshes
 }
 
 /**
- * Reset all game state for new game
+ * Get or create player ID
  */
-function resetGameState() {
-  currentRound = 0;
-  playerScore = 0;
-  opponentScore = 0;
-  isPlayer1 = false;
+export function getPlayerId() {
+  if (!playerId) {
+    initPlayer();
+  }
+  return playerId;
 }
-
-export { 
-  roomId, playerId, isPlayer1, currentRound, 
-  playerScore, opponentScore, initPlayer, resetGameState 
-};
