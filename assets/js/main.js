@@ -14,14 +14,21 @@ function initGame() {
     verifyDOM();
     initPlayer();
     
-    // Expose functions to global scope
-    window.game = {
+    // Create game object
+    const game = {
       createRoom: RoomManager.createRoom,
       joinRoom: RoomManager.joinRoom,
       playMove: GameLogic.playMove,
       requestReset: UIController.requestReset,
       confirmReset: UIController.confirmReset
     };
+    
+    // Make available globally
+    window.game = game;
+    
+    // Add event listeners properly
+    document.getElementById('createRoomBtn')?.addEventListener('click', game.createRoom);
+    document.getElementById('joinRoomBtn')?.addEventListener('click', game.joinRoom);
     
     console.log("Game initialized successfully");
   } catch (error) {
