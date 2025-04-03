@@ -10,6 +10,7 @@ import {
   playerScore,
   opponentScore,
 } from "../core/game-state.js";
+import * as GameState from "../core/game-state.js";
 import { elements } from "../core/dom-manager.js";
 import { getRoomRef } from "../core/firebase.js";
 import { setButtonsDisabled } from "./ui-controller.js";
@@ -61,9 +62,13 @@ function checkRoundCompletion() {
 
   roomRef.once("value").then((snapshot) => {
     const room = snapshot.val();
-    if (room.player1.move && room.player2.move && room.round === currentRound) {
+    if (
+      room.player1.move &&
+      room.player2.move &&
+      room.round === GameState.currentRound
+    ) {
       roomRef.update({
-        round: currentRound + 1,
+        round: GameState.currentRound + 1,
         lastUpdated: firebase.database.ServerValue.TIMESTAMP,
       });
     }
@@ -103,32 +108,32 @@ function determineWinner(p1Move, p2Move) {
 
 function updateScores(result) {
   if (result.winner === "player1") {
-    if (isPlayer1) {
-      playerScore++;
+    if (GameState.isPlayer1) {
+      GameState.playerScore++;
     } else {
-      opponentScore++;
+      GameState.opponentScore++;
     }
   } else if (result.winner === "player2") {
-    if (isPlayer1) {
-      opponentScore++;
+    if (GameState.isPlayer1) {
+      GameState.opponentScore++;
     } else {
-      playerScore++;
+      GameState.playerScore++;
     }
   }
 
   const roomRef = getRoomRef(roomId);
   roomRef.update({
     scores: {
-      player1: isPlayer1 ? playerScore : opponentScore,
-      player2: isPlayer1 ? opponentScore : playerScore,
+      player1: GameState.isPlayer1 ? GameState.playerScore : GameState.opponentScore,
+      player2: GameState.isPlayer1 ? GameState.opponentScore : GameState.playerScore,
     },
     lastUpdated: firebase.database.ServerValue.TIMESTAMP,
   });
 }
 function displayResults(result) {
   elements.result.textContent = result.message;
-  elements.playerScore.textContent = playerScore;
-  elements.opponentScore.textContent = opponentScore;
+  elements.playerScore.textContent = GameState.playerScore;
+  elements.opponentScore.textContent = GameState.opponentScore;
 }
 
 function prepareNextRound() {
