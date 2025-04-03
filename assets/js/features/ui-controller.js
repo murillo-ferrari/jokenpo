@@ -129,3 +129,17 @@ export function confirmReset(accept) {
   }
   elements.resetConfirm.style.display = "none";
 }
+
+/**
+ * Request a game reset
+ */
+export function requestReset() {
+  const roomRef = getRoomRef(roomId);
+  roomRef.update({
+    resetRequest: {
+      playerId: playerId,
+      timestamp: firebase.database.ServerValue.TIMESTAMP,
+    },
+    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+  });
+}
