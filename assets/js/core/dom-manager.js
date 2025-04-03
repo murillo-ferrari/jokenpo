@@ -20,7 +20,12 @@ const optionalElements = {
   resetConfirm: "reset-confirm",
   rockBtn: "rock-btn",
   paperBtn: "paper-btn",
-  scissorsBtn: "scissors-btn"
+  scissorsBtn: "scissors-btn",
+  createRoomBtn: "createRoomBtn",
+  joinRoomBtn: "joinRoomBtn",
+  resetBtn: "reset-btn",
+  confirmResetBtn: "confirm-reset-btn",
+  denyResetBtn: "deny-reset-btn"
 };
 
 // Combined elements collection

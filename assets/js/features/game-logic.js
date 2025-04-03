@@ -103,9 +103,17 @@ function determineWinner(p1Move, p2Move) {
 
 function updateScores(result) {
   if (result.winner === "player1") {
-    isPlayer1 ? playerScore++ : opponentScore++;
+    if (isPlayer1) {
+      playerScore++;
+    } else {
+      opponentScore++;
+    }
   } else if (result.winner === "player2") {
-    isPlayer1 ? opponentScore++ : playerScore++;
+    if (isPlayer1) {
+      opponentScore++;
+    } else {
+      playerScore++;
+    }
   }
 
   const roomRef = getRoomRef(roomId);
@@ -117,7 +125,6 @@ function updateScores(result) {
     lastUpdated: firebase.database.ServerValue.TIMESTAMP,
   });
 }
-
 function displayResults(result) {
   elements.result.textContent = result.message;
   elements.playerScore.textContent = playerScore;

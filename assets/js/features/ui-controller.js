@@ -26,19 +26,16 @@ export function setButtonsDisabled(disabled) {
  * @param {string|null} theirMove - Opponent's move
  */
 export function updateButtonState(myMove, theirMove) {
-  const shouldDisable = myMove || (myMove && theirMove);
+  const shouldDisable = !!myMove;
   setButtonsDisabled(shouldDisable);
 
   const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
   buttons.forEach((btn) => {
     if (!btn) return;
 
-    if (myMove && !theirMove) {
+    if (myMove) {
       btn.style.opacity = "0.5";
       btn.style.cursor = "not-allowed";
-    } else if (myMove && theirMove) {
-      btn.style.opacity = "0.5";
-      btn.style.cursor = "wait";
     } else {
       btn.style.opacity = "1";
       btn.style.cursor = "pointer";
@@ -53,16 +50,30 @@ export function setupRoomListener() {
   const roomRef = getRoomRef(roomId);
 
   roomRef.on("value", (snapshot) => {
-    const room = snapshot.val();
-    if (!room) return;
+    try {
+      const room = snapshot.val();
+      if (!room) {
+        elements.waiting.style.display = "none";
+        elements.game.style.display = "none";
+        elements.setup.style.display = "block";
+        alert("Room no longer exists");
+        return;
+      }
 
-    if (!room.player1?.id || !room.player2?.id) return;
+      if (!room.player1?.id || !room.player2?.id) {
+        elements.waiting.style.display = "block";
+        elements.game.style.display = "none";
+        return;
+      }
 
-    // Update game UI
-    updateGameUI(room);
+      // Update game UI
+      updateGameUI(room);
 
-    // Handle moves and results
-    handleGameProgress(room);
+      // Handle moves and results
+      handleGameProgress(room);
+    } catch (error) {
+      console.error("Room listener error:", error);
+    }
   });
 }
 
