@@ -90,5 +90,3 @@ function handleRoomError(error) {
   elements.waiting.style.display = "none";
   alert(error.message || "Error joining room. Please try again.");
 }
-
-export { createRoom, joinRoom };

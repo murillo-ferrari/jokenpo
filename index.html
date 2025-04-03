@@ -9,13 +9,20 @@
 </head>
 
 <body>
+    <!-- Load Firebase FIRST -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+
+    <!-- Load the Game main file  -->
+    <script type="module" src="assets/js/main.js"></script>
+
     <div id="firebase-error"></div>
     <h1>🎮 Online Jokenpo</h1>
 
     <div id="setup">
         <input type="text" id="roomId" placeholder="Enter Room ID">
-        <button onclick="game.joinRoom()">Join Room</button>
-        <button onclick="game.createRoom()">Create Room</button>
+        <button id="joinRoomBtn">Join Room</button>
+        <button id="createRoomBtn">Create Room</button>
     </div>
 
     <div id="waiting">Waiting for opponent to join...</div>
@@ -46,15 +53,8 @@
             <p>Opponent wants to reset. Accept?</p>
             <button onclick="game.confirmReset(true)">Yes</button>
             <button onclick="game.confirmReset(false)">No</button>
-          </div>
+        </div>
     </div>
-
-    <!-- Load Firebase FIRST -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
-
-    <!-- Load the Game main file  -->
-    <script type="module" src="assets/js/main.js"></script>
 </body>
 
 </html>
