@@ -15,9 +15,18 @@ let buttonsDisabled = false;
  */
 export function setButtonsDisabled(disabled) {
   buttonsDisabled = disabled;
-  if (elements.rockBtn) elements.rockBtn.disabled = disabled;
-  if (elements.paperBtn) elements.paperBtn.disabled = disabled;
-  if (elements.scissorsBtn) elements.scissorsBtn.disabled = disabled;
+  if (elements.rockBtn) {
+      elements.rockBtn.disabled = disabled;
+      console.log(`Rock button disabled: ${disabled}`); // Debug log
+  }
+  if (elements.paperBtn) {
+      elements.paperBtn.disabled = disabled;
+      console.log(`Paper button disabled: ${disabled}`); // Debug log
+  }
+  if (elements.scissorsBtn) {
+      elements.scissorsBtn.disabled = disabled;
+      console.log(`Scissors button disabled: ${disabled}`); // Debug log
+  }
 }
 
 /**
@@ -26,20 +35,15 @@ export function setButtonsDisabled(disabled) {
  * @param {string|null} theirMove - Opponent's move
  */
 export function updateButtonState(myMove, theirMove) {
-  const shouldDisable = !!myMove;
+  const shouldDisable = !!myMove; // Only disable if player has made a move
   setButtonsDisabled(shouldDisable);
 
   const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
   buttons.forEach((btn) => {
-    if (!btn) return;
-
-    if (myMove) {
-      btn.style.opacity = "0.5";
-      btn.style.cursor = "not-allowed";
-    } else {
-      btn.style.opacity = "1";
-      btn.style.cursor = "pointer";
-    }
+      if (!btn) return;
+      
+      btn.style.opacity = shouldDisable ? "0.5" : "1";
+      btn.style.cursor = shouldDisable ? "not-allowed" : "pointer";
   });
 }
 
