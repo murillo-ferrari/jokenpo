@@ -41,16 +41,18 @@ jobs:
           # Debug output
           echo "Firebase config (first 20 chars): ${FIREBASE_CONFIG:0:20}..."
           
-          # Replace in file
-          npx replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" assets/js/scripts.js
+          # Replace in all JS files that might contain the placeholder
+          find assets/js -name "*.js" | while read file; do
+            npx replace-in-file "@@FIREBASE_CONFIG@@" "$FIREBASE_CONFIG" "$file"
+          done
           
-          # Verify
-          if grep -q "$FIREBASE_CONFIG" assets/js/scripts.js; then
+          # Verify injection in core/firebase.js
+          if grep -q "$FIREBASE_CONFIG" assets/js/core/firebase.js; then
             echo "Config injected successfully"
           else
-            echo "::error::Injection failed - placeholder not found"
+            echo "::error::Injection failed - placeholder not found in firebase.js"
             echo "Current file content:"
-            head -n 20 assets/js/scripts.js
+            head -n 20 assets/js/core/firebase.js
             exit 1
           fi
           
