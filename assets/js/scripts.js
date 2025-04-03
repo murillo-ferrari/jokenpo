@@ -17,6 +17,9 @@ let buttonsDisabled = false;
 const elements = {
   setup: document.getElementById("setup"),
   waiting: document.getElementById("waiting"),
+  shareRoom: document.getElementById("share-room"),
+  roomIdDisplay: document.getElementById("room-id-display"),
+  copyBtn: document.getElementById("copy-btn"),
   game: document.getElementById("game"),
   roomIdInput: document.getElementById("roomId"),
   playerChoice: document.getElementById("player-choice"),
@@ -73,10 +76,28 @@ function initializeButtons() {
 // Initialize buttons when the script loads
 initializeButtons();
 
+// Allow users to copy room ID
+function copyRoomId() {
+  navigator.clipboard
+    .writeText(roomId)
+    .then(() => {
+      elements.copyBtn.textContent = "Copied!";
+      setTimeout(() => {
+        elements.copyBtn.textContent = "Copy Room ID";
+      }, 2000);
+    })
+    .catch((err) => {
+      console.error("Failed to copy room ID: ", err);
+    });
+}
+
 // Room Management
 function createRoom() {
   roomId = Math.random().toString(36).slice(2, 6).toUpperCase();
   elements.roomIdInput.value = roomId;
+  // Show the room ID display
+  elements.shareRoom.style.display = "block";
+  elements.roomIdDisplay.textContent = roomId;
   joinRoom();
 }
 
@@ -97,6 +118,9 @@ function joinRoom() {
     (currentData) => {
       if (!currentData) {
         isPlayer1 = true;
+        // Show share room section only for the room creator
+        elements.shareRoom.style.display = "block";
+        elements.roomIdDisplay.textContent = roomId;
         return {
           player1: {
             id: playerId,
@@ -413,3 +437,4 @@ window.joinRoom = joinRoom;
 window.playMove = playMove;
 window.requestReset = requestReset;
 window.confirmReset = confirmReset;
+window.copyRoomId = copyRoomId;
