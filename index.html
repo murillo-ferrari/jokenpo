@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Online Jokenpo</title>
-    <link rel="stylesheet" href="assets\css\styles.css">
+    <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 
 <body>
@@ -15,7 +15,7 @@
     <div id="setup">
         <input type="text" id="roomId" placeholder="Enter Room ID">
         <button onclick="joinRoom()">Join Room</button>
-        <button onclick="createRoom()" style="background:#0F9D58">Create New Room</button>
+        <button class="create-room-btn" onclick="createRoom()">Create New Room</button>
     </div>
 
     <div id="waiting">Waiting for opponent to join...</div>
@@ -30,23 +30,22 @@
 
         <div class="choice-display">
             <span id="player-choice">?</span>
-            <span style="font-size:24px">vs</span>
+            <span class="vs-text">vs</span>
             <span id="opponent-choice">?</span>
         </div>
 
         <div id="result"></div>
 
         <div class="scores">
-            <span style="color:#4285F4">You: <span id="player-score">0</span></span> |
-            <span style="color:#DB4437">Opponent: <span id="opponent-score">0</span></span>
+            <span class="player-score">You: <span id="player-score">0</span></span> |
+            <span class="opponent-score">Opponent: <span id="opponent-score">0</span></span>
         </div>
 
-        <button onclick="requestReset()" style="background:#DB4437; margin-top:30px">Reset Game</button>
-        <div id="reset-confirm"
-            style="display:none; margin-top:10px; padding:10px; background:#f0f0f0; border-radius:5px;">
+        <button class="reset-btn" onclick="requestReset()">Reset Game</button>
+        <div id="reset-confirm" class="reset-confirm">
             <p>Opponent wants to reset. Accept?</p>
-            <button onclick="confirmReset(true)" style="background:#0F9D58; margin-right:10px;">Yes</button>
-            <button onclick="confirmReset(false)" style="background:#DB4437">No</button>
+            <button class="reset-confirm-btn-yes" onclick="confirmReset(true)">Yes</button>
+            <button class="reset-confirm-btn-no" onclick="confirmReset(false)">No</button>
         </div>
     </div>
 
@@ -54,9 +53,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
 
-    <!-- Game Logic -->
-    <script src="assets\js\scripts.js"></script>
-
+    <!-- Load the Game main file  -->
+    <script type="module" src="assets/js/main.js"></script>
 </body>
 
 </html>
