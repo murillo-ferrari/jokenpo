@@ -30,6 +30,21 @@ const elements = {
   scissorsBtn: document.getElementById("scissors-btn"),
 };
 
+// Verify all required DOM elements exist
+function verifyElements() {
+  for (const [key, element] of Object.entries(elements)) {
+    if (!element) {
+      console.error(`Missing DOM element: ${key}`);
+      return false;
+    }
+  }
+  return true;
+}
+
+if (!verifyElements()) {
+  alert("Critical error: Missing required game elements. Please refresh the page.");
+}
+
 // Emoji Mapping
 const emojis = {
   rock: "✊",
@@ -120,84 +135,96 @@ function handleRoomError(error) {
   alert(error.message || "Error joining room. Please try again.");
 }
 
+// Game State Management
 function setupRoomListener() {
   roomRef.on("value", (snapshot) => {
-    const room = snapshot.val();
-    if (!room) {
-      alert("Room was deleted by the host");
-      location.reload();
-      return;
-    }
-
-    if (!room.player1.id || !room.player2 || !room.player2.id) {
-      return;
-    }
-
-    elements.waiting.style.display = "none";
-    elements.game.style.display = "block";
-
-    playerScore = isPlayer1 ? room.scores.player1 : room.scores.player2;
-    opponentScore = isPlayer1 ? room.scores.player2 : room.scores.player1;
-    updateScores();
-
-    if (room.resetRequest) {
-      if (room.resetRequest.playerId !== playerId) {
-        elements.resetConfirm.style.display = "block";
+    try {
+      const room = snapshot.val();
+      if (!room) {
+        alert("Room was deleted by the host");
+        location.reload();
         return;
       }
-      elements.resetConfirm.style.display = "none";
-    } else {
-      elements.resetConfirm.style.display = "none";
+
+      if (!room.player1 || !room.player2) {
+        return;
+      }
+
+      elements.waiting.style.display = "none";
+      elements.game.style.display = "block";
+
+      // Update scores
+      playerScore = isPlayer1 ? room.scores.player1 : room.scores.player2;
+      opponentScore = isPlayer1 ? room.scores.player2 : room.scores.player1;
+      updateScores();
+
+      // Handle reset requests
+      if (room.resetRequest) {
+        if (room.resetRequest.playerId !== playerId) {
+          elements.resetConfirm.style.display = "block";
+        } else {
+          elements.resetConfirm.style.display = "none";
+        }
+      } else {
+        elements.resetConfirm.style.display = "none";
+      }
+
+      // Get current player moves
+      const myMove = isPlayer1 ? room.player1.move : room.player2.move;
+      const theirMove = isPlayer1 ? room.player2.move : room.player1.move;
+
+      // Update UI based on game state
+      if (room.player1.move && room.player2.move) {
+        if (room.round > currentRound) {
+          currentRound = room.round;
+          calculateResults(room.player1.move, room.player2.move);
+        } else {
+          elements.result.textContent = "Calculating...";
+        }
+      } else {
+        elements.playerChoice.textContent = myMove ? "✓" : "?";
+        elements.opponentChoice.textContent = theirMove ? "✓" : "?";
+        elements.result.textContent = "";
+      }
+
+      // Update button states
+      updateButtonState(myMove, theirMove);
+    } catch (error) {
+      console.error("Listener error:", error);
     }
-
-    if (room.player1.move && room.player2.move && room.round > currentRound) {
-      currentRound = room.round;
-      showResults(room.player1, room.player2);
-      return;
-    }
-
-    elements.playerChoice.textContent = 
-      (isPlayer1 ? room.player1.move : room.player2.move) ? '✓' : '?';
-    elements.opponentChoice.textContent = '?';
-    elements.result.textContent = 
-      (room.player1.move && room.player2.move) ? "Calculating..." : "";
-
-    const myMove = isPlayer1 ? room.player1.move : room.player2.move;
-    const theirMove = isPlayer1 ? room.player2.move : room.player1.move;
-    updateButtonState(myMove, theirMove);
   });
 }
 
 function updateButtonState(myMove, theirMove) {
-  const shouldDisable = myMove || (myMove && theirMove);
-  setButtonsDisabled(shouldDisable);
+  try {
+    const shouldDisable = myMove || !theirMove;
+    setButtonsDisabled(shouldDisable);
 
-  const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
-  buttons.forEach((btn) => {
-    if (myMove && !theirMove) {
-      btn.style.opacity = "0.5";
-      btn.style.cursor = "not-allowed";
-      return;
-    }
-
-    if (myMove && theirMove) {
-      btn.style.opacity = "0.5";
-      btn.style.cursor = "wait";
-      return;
-    }
-
-    btn.style.opacity = "1";
-    btn.style.cursor = "pointer";
-  });
+    const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
+    buttons.forEach((btn) => {
+      if (!btn) return;
+      
+      if (myMove) {
+        btn.style.opacity = "0.5";
+        btn.style.cursor = "not-allowed";
+      } else {
+        btn.style.opacity = "1";
+        btn.style.cursor = "pointer";
+      }
+    });
+  } catch (error) {
+    console.error("Button state error:", error);
+  }
 }
 
 function setButtonsDisabled(disabled) {
   buttonsDisabled = disabled;
-  elements.rockBtn.disabled = disabled;
-  elements.paperBtn.disabled = disabled;
-  elements.scissorsBtn.disabled = disabled;
+  if (elements.rockBtn) elements.rockBtn.disabled = disabled;
+  if (elements.paperBtn) elements.paperBtn.disabled = disabled;
+  if (elements.scissorsBtn) elements.scissorsBtn.disabled = disabled;
 }
 
+// Game Actions
 function playMove(move) {
   if (buttonsDisabled) return;
 
@@ -205,31 +232,26 @@ function playMove(move) {
     const room = snapshot.val();
     if (!room) return;
 
-    let playerPath;
+    const updates = {};
     if (room.player1.id === playerId) {
-      playerPath = "player1";
+      updates["player1/move"] = move;
       isPlayer1 = true;
-    }
-
-    if (room.player2.id === playerId) {
-      playerPath = "player2";
+    } else if (room.player2.id === playerId) {
+      updates["player2/move"] = move;
       isPlayer1 = false;
-    }
-
-    if (!playerPath) {
+    } else {
       console.error("Player ID mismatch!");
       return;
     }
 
-    const updates = {};
-    updates[`${playerPath}/move`] = move;
-    updates[`${playerPath}/timestamp`] = firebase.database.ServerValue.TIMESTAMP;
     updates["lastUpdated"] = firebase.database.ServerValue.TIMESTAMP;
 
     return roomRef.update(updates);
   }).then(() => {
     elements.playerChoice.textContent = "✓";
     setButtonsDisabled(true);
+
+    // Check if both players have moved
     return roomRef.once("value");
   }).then(snapshot => {
     const room = snapshot.val();
@@ -244,76 +266,48 @@ function playMove(move) {
   });
 }
 
-function showResults(player1, player2) {
-  const p1Move = player1.move;
-  const p2Move = player2.move;
-  
+function calculateResults(p1Move, p2Move) {
+  // Display moves
   elements.playerChoice.textContent = emojis[isPlayer1 ? p1Move : p2Move];
   elements.opponentChoice.textContent = emojis[isPlayer1 ? p2Move : p1Move];
-  
+
+  // Determine winner
   let result = "It's a tie!";
-  
-  if ((p1Move === 'rock' && p2Move === 'scissors') ||
-      (p1Move === 'paper' && p2Move === 'rock') ||
-      (p1Move === 'scissors' && p2Move === 'paper')) {
-    result = isPlayer1 ? "You win! 🎉" : "Opponent wins!";
-    if (isPlayer1) {
-      playerScore++;
+  if (p1Move !== p2Move) {
+    const winConditions = {
+      rock: "scissors",
+      paper: "rock",
+      scissors: "paper"
+    };
+
+    if (winConditions[p1Move] === p2Move) {
+      result = isPlayer1 ? "You win! 🎉" : "Opponent wins!";
+      if (isPlayer1) playerScore++;
+      else opponentScore++;
     } else {
-      opponentScore++;
+      result = isPlayer1 ? "Opponent wins!" : "You win! 🎉";
+      if (!isPlayer1) playerScore++;
+      else opponentScore++;
     }
   }
 
-  if ((p1Move === 'scissors' && p2Move === 'paper') ||
-      (p1Move === 'rock' && p2Move === 'scissors') ||
-      (p1Move === 'paper' && p2Move === 'rock')) {
-    result = isPlayer1 ? "You win! 🎉" : "Opponent wins!";
-    if (isPlayer1) {
-      playerScore++;
-    } else {
-      opponentScore++;
-    }
-  }
-
-  if ((p1Move === 'paper' && p2Move === 'rock') ||
-      (p1Move === 'scissors' && p2Move === 'paper') ||
-      (p1Move === 'rock' && p2Move === 'scissors')) {
-    result = isPlayer1 ? "You win! 🎉" : "Opponent wins!";
-    if (isPlayer1) {
-      playerScore++;
-    } else {
-      opponentScore++;
-    }
-  }
-
-  if (!(p1Move === p2Move) && 
-      !((p1Move === 'rock' && p2Move === 'scissors') ||
-        (p1Move === 'paper' && p2Move === 'rock') ||
-        (p1Move === 'scissors' && p2Move === 'paper'))) {
-    result = isPlayer1 ? "Opponent wins!" : "You win! 🎉";
-    if (!isPlayer1) {
-      playerScore++;
-    } else {
-      opponentScore++;
-    }
-  }
-  
   elements.result.textContent = result;
   updateScores();
-  
+
+  // Update scores in database
   roomRef.update({
-    'scores': {
+    scores: {
       player1: isPlayer1 ? playerScore : opponentScore,
       player2: isPlayer1 ? opponentScore : playerScore
     },
     lastUpdated: firebase.database.ServerValue.TIMESTAMP
   });
-  
+
+  // Reset for next round
   setTimeout(() => {
     roomRef.update({
-      'player1/move': null,
-      'player2/move': null,
-      'round': 0,
+      "player1/move": null,
+      "player2/move": null,
       lastUpdated: firebase.database.ServerValue.TIMESTAMP
     });
     elements.result.textContent = "";
@@ -324,10 +318,11 @@ function showResults(player1, player2) {
 }
 
 function updateScores() {
-  elements.playerScore.textContent = playerScore;
-  elements.opponentScore.textContent = opponentScore;
+  if (elements.playerScore) elements.playerScore.textContent = playerScore;
+  if (elements.opponentScore) elements.opponentScore.textContent = opponentScore;
 }
 
+// Reset Functions
 function requestReset() {
   roomRef.update({
     resetRequest: {
