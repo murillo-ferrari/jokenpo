@@ -1,10 +1,7 @@
 /**
- * Core game state management
+ * Manages the game state and player information
  */
 
-import { generatePlayerId } from './firebase.js';
-
-// Game state variables
 let roomId = null;
 let playerId = null;
 let isPlayer1 = false;
@@ -13,31 +10,29 @@ let playerScore = 0;
 let opponentScore = 0;
 
 /**
- * Initialize player with unique ID
+ * Initialize player with new ID
  */
 function initPlayer() {
-    playerId = localStorage.getItem('playerId') || generatePlayerId();
-    localStorage.setItem('playerId', playerId);
+  playerId = generatePlayerId();
 }
 
 /**
- * Get or create player ID
+ * Reset all game state for new game
  */
-function getPlayerId() {
-    if (!playerId) {
-        initPlayer();
-    }
-    return playerId;
+function resetGameState() {
+  currentRound = 0;
+  playerScore = 0;
+  opponentScore = 0;
+  isPlayer1 = false;
 }
 
-// Export all state variables
-export { 
-    roomId, 
-    playerId, 
-    isPlayer1, 
-    currentRound,
-    playerScore,
-    opponentScore,
-    initPlayer,
-    getPlayerId 
+export {
+  roomId,
+  playerId,
+  isPlayer1,
+  currentRound,
+  playerScore,
+  opponentScore,
+  initPlayer,
+  resetGameState,
 };
