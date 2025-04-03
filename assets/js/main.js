@@ -3,6 +3,7 @@
  * Initializes the game and connects all modules
  */
 
+import { database, generatePlayerId, getRoomRef } from "./core/firebase.js";
 import { initPlayer } from "./core/game-state.js";
 import { verifyDOM } from "./core/dom-manager.js";
 import { createRoom, joinRoom } from "./features/room-manager.js";
