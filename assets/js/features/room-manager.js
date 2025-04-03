@@ -2,10 +2,10 @@
  * Handles room creation, joining, and player management
  */
 
-import { getRoomRef } from "../core/firebase.js";
-import { roomId, playerId, isPlayer1 } from "../core/game-state.js";
-import { elements } from "../core/dom-manager.js";
-import { setupRoomListener } from "./ui-controller.js";
+import { getRoomRef } from '../core/firebase.js';
+import { roomId, playerId, isPlayer1 } from '../core/game-state.js';
+import { elements } from '../core/dom-manager.js';
+import { setupRoomListener } from './ui-controller.js';
 
 /**
  * Create a new game room
@@ -91,4 +91,4 @@ function handleRoomError(error) {
   alert(error.message || "Error joining room. Please try again.");
 }
 
-export { createRoom, joinRoom, handleRoomError };
+export { createRoom, joinRoom };
