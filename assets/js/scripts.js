@@ -27,12 +27,12 @@ const elements = {
   result: document.getElementById("result"),
   playerScore: document.getElementById("player-score"),
   opponentScore: document.getElementById("opponent-score"),
-  totalRounds: document.getElementById("total-rounds"),
-  totalTies: document.getElementById("total-ties"),
   resetConfirm: document.getElementById("reset-confirm"),
   rockBtn: document.getElementById("rock-btn"),
   paperBtn: document.getElementById("paper-btn"),
   scissorsBtn: document.getElementById("scissors-btn"),
+  totalRounds: document.getElementById("total-rounds"),
+  totalTies: document.getElementById("total-ties"),
 };
 
 // Verify all required DOM elements exist
@@ -207,7 +207,9 @@ function setupRoomListener() {
       // Update scores
       playerScore = isPlayer1 ? room.scores.player1 : room.scores.player2;
       opponentScore = isPlayer1 ? room.scores.player2 : room.scores.player1;
+      currentRound = room.round; // Update currentRound from Firebase
       updateScores();
+      updateGameStats();
 
       // Handle reset requests
       if (room.resetRequest) {
@@ -227,7 +229,6 @@ function setupRoomListener() {
       // Update UI based on game state
       if (room.player1.move && room.player2.move) {
         if (room.round > currentRound) {
-          currentRound = room.round;
           calculateResults(room.player1.move, room.player2.move);
         } else {
           // Only show "Calculating..." if we haven't processed the result yet
@@ -326,14 +327,10 @@ function playMove(move) {
     })
     .then((snapshot) => {
       const room = snapshot.val();
-      if (
-        room.player1.move &&
-        room.player2.move &&
-        room.round === currentRound
-      ) {
+      if (room.player1.move && room.player2.move) {
         console.log("Both players moved - advancing round");
         return roomRef.update({
-          round: currentRound + 1,
+          round: room.round + 1,
           lastUpdated: firebase.database.ServerValue.TIMESTAMP,
         });
       }
@@ -374,7 +371,6 @@ function calculateResults(p1Move, p2Move) {
   updateScores();
   updateGameStats();
 
-
   // Update scores in database
   roomRef.update({
     scores: {
@@ -403,8 +399,13 @@ function calculateResults(p1Move, p2Move) {
 
 function updateScores() {
   if (elements.playerScore) elements.playerScore.textContent = playerScore;
-  if (elements.opponentScore)
-    elements.opponentScore.textContent = opponentScore;
+  if (elements.opponentScore) elements.opponentScore.textContent = opponentScore;
+}
+
+function updateGameStats() {
+  if (elements.totalRounds) elements.totalRounds.textContent = currentRound;
+  const ties = currentRound - (playerScore + opponentScore);
+  if (elements.totalTies) elements.totalTies.textContent = ties > 0 ? ties : 0;
 }
 
 // Reset Functions
@@ -422,7 +423,9 @@ function confirmReset(accept) {
   if (accept) {
     playerScore = 0;
     opponentScore = 0;
+    currentRound = 0;
     updateScores();
+    updateGameStats();
 
     roomRef.update({
       scores: { player1: 0, player2: 0 },
@@ -436,8 +439,6 @@ function confirmReset(accept) {
     elements.result.textContent = "";
     elements.playerChoice.textContent = "?";
     elements.opponentChoice.textContent = "?";
-    currentRound = 0;
-    updateGameStats()
     setButtonsDisabled(false);
     return;
   }
