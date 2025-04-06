@@ -27,6 +27,8 @@ const elements = {
   result: document.getElementById("result"),
   playerScore: document.getElementById("player-score"),
   opponentScore: document.getElementById("opponent-score"),
+  totalRounds: document.getElementById("total-rounds"),
+  totalTies: document.getElementById("total-ties"),
   resetConfirm: document.getElementById("reset-confirm"),
   rockBtn: document.getElementById("rock-btn"),
   paperBtn: document.getElementById("paper-btn"),
@@ -370,6 +372,8 @@ function calculateResults(p1Move, p2Move) {
 
   elements.result.textContent = result;
   updateScores();
+  updateGameStats();
+
 
   // Update scores in database
   roomRef.update({
@@ -433,6 +437,7 @@ function confirmReset(accept) {
     elements.playerChoice.textContent = "?";
     elements.opponentChoice.textContent = "?";
     currentRound = 0;
+    updateGameStats()
     setButtonsDisabled(false);
     return;
   }

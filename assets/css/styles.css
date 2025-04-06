@@ -168,3 +168,9 @@ button:hover {
 #copy-btn:hover {
     background-color: #2980b9;
 }
+
+.game-stats {
+    margin-top: 5px;
+    font-size: 0.9em;
+    color: #666;
+}
