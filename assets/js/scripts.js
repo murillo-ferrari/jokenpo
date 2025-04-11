@@ -39,17 +39,16 @@ const elements = {
 function verifyElements() {
   for (const [key, element] of Object.entries(elements)) {
     if (!element) {
-      console.error(`Missing DOM element: ${key}`);
-      return false;
+      throw new Error(`Missing DOM element: ${key}`);
     }
   }
-  return true;
 }
 
-if (!verifyElements()) {
-  alert(
-    "Critical error: Missing required game elements. Please refresh the page."
-  );
+try {
+  verifyElements();
+} catch (error) {
+  alert(error.message);
+  throw error;
 }
 
 // Emoji Mapping
@@ -61,17 +60,18 @@ const emojis = {
 
 // Initialize button event listeners
 function initializeButtons() {
-  if (elements.rockBtn) {
-    elements.rockBtn.addEventListener("click", () => playMove("rock"));
-    elements.rockBtn.disabled = false;
-  }
-  if (elements.paperBtn) {
-    elements.paperBtn.addEventListener("click", () => playMove("paper"));
-    elements.paperBtn.disabled = false;
-  }
-  if (elements.scissorsBtn) {
-    elements.scissorsBtn.addEventListener("click", () => playMove("scissors"));
-    elements.scissorsBtn.disabled = false;
+  const buttons = {
+    rockBtn: "rock",
+    paperBtn: "paper",
+    scissorsBtn: "scissors",
+  };
+
+  for (const [btnKey, move] of Object.entries(buttons)) {
+    const btn = elements[btnKey];
+    if (btn) {
+      btn.addEventListener("click", () => playMove(move));
+      btn.disabled = false;
+    }
   }
 }
 
@@ -356,15 +356,10 @@ function calculateResults(p1Move, p2Move) {
       scissors: "paper",
     };
 
-    if (winConditions[p1Move] === p2Move) {
-      result = isPlayer1 ? "You win! 🎉" : "Opponent wins!";
-      if (isPlayer1) playerScore++;
-      else opponentScore++;
-    } else {
-      result = isPlayer1 ? "Opponent wins!" : "You win! 🎉";
-      if (!isPlayer1) playerScore++;
-      else opponentScore++;
-    }
+    const playerWon = winConditions[p1Move] === p2Move;
+    result = playerWon ? "You win! 🎉" : "Opponent wins!";
+    if (playerWon === isPlayer1) playerScore++;
+    else opponentScore++;
   }
 
   elements.result.textContent = result;
@@ -372,7 +367,7 @@ function calculateResults(p1Move, p2Move) {
   updateGameStats();
 
   // Update scores in database
-  roomRef.update({
+  updateRoom({
     scores: {
       player1: isPlayer1 ? playerScore : opponentScore,
       player2: isPlayer1 ? opponentScore : playerScore,
@@ -382,15 +377,12 @@ function calculateResults(p1Move, p2Move) {
 
   // Reset for next round
   setTimeout(() => {
-    roomRef.update({
+    updateRoom({
       "player1/move": null,
       "player2/move": null,
       lastUpdated: firebase.database.ServerValue.TIMESTAMP,
     });
-    // Only clear these if we're not showing a tie
-    if (elements.result.textContent !== "It's a tie!") {
-      elements.result.textContent = "";
-    }
+    elements.result.textContent = "";
     elements.playerChoice.textContent = "?";
     elements.opponentChoice.textContent = "?";
     setButtonsDisabled(false);
@@ -399,7 +391,8 @@ function calculateResults(p1Move, p2Move) {
 
 function updateScores() {
   if (elements.playerScore) elements.playerScore.textContent = playerScore;
-  if (elements.opponentScore) elements.opponentScore.textContent = opponentScore;
+  if (elements.opponentScore)
+    elements.opponentScore.textContent = opponentScore;
 }
 
 function updateGameStats() {
