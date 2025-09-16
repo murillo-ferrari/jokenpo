@@ -1,0 +1,82 @@
+/* Game Components Module */
+/* Game-specific UI components */
+
+/* Choice Display */
+.choice-display {
+    font-size: 60px;
+    margin: 30px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+}
+
+.choice-display span {
+    display: inline-block;
+    min-width: 80px;
+    padding: 10px;
+    border-radius: 10px;
+    background: #f9f9f9;
+    border: 2px solid #e0e0e0;
+}
+
+/* Game Result */
+#result {
+    font-size: 28px;
+    font-weight: bold;
+    margin: 25px 0;
+    min-height: 40px;
+    color: #2E7D32;
+    padding: 15px;
+    border-radius: 8px;
+    background: rgba(46, 125, 50, 0.1);
+}
+
+/* Scores Display */
+.scores {
+    font-size: 20px;
+    margin: 25px 0;
+    padding: 15px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+}
+
+.player-score {
+    color: #4285F4;
+    font-weight: bold;
+}
+
+.opponent-score {
+    color: #DB4437;
+    font-weight: bold;
+}
+
+/* Game Statistics */
+.game-stats {
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #666;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+}
+
+/* VS Text */
+.vs-text {
+    font-size: 24px;
+    color: #666;
+    font-weight: bold;
+}
+
+/* Move Indicators */
+#player-choice,
+#opponent-choice {
+    transition: all 0.3s ease;
+}
+
+#player-choice.moved,
+#opponent-choice.moved {
+    background-color: #e8f5e8;
+    border-color: #4caf50;
+    color: #2e7d32;
+}
