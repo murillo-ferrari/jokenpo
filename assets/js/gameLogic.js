@@ -553,8 +553,6 @@ export function playMove(move) {
     return;
   }
 
-//   console.log(`Playing move: ${move}`);
-
   state.isProcessingMove = true;
   updateButtonState(true);
   elements.playerChoice.textContent = "✓";
