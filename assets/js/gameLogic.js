@@ -236,13 +236,16 @@ function setupRoomListener() {
         state.pendingResetRequest = isRequester;
 
         if (!isRequester) {
-          elements.resetConfirm.style.display = "block";
+          elements.resetConfirm.style.display = "flex";
+          elements.resetConfirm.setAttribute("aria-hidden", "false");
         } else {
           elements.resetConfirm.style.display = "none";
+          elements.resetConfirm.setAttribute("aria-hidden", "true");
         }
 
       } else {
         elements.resetConfirm.style.display = "none";
+        elements.resetConfirm.setAttribute("aria-hidden", "true");
         state.pendingResetRequest = false;
       }
 
@@ -470,6 +473,7 @@ export function joinRoom() {
   elements.setup.style.display = "none";
   elements.waiting.style.display = "flex";
   elements.resetConfirm.style.display = "none";
+  elements.resetConfirm.setAttribute("aria-hidden", "true");
   elements.shareRoom.style.display = "none";
 
   state.pendingResetRequest = false;
@@ -684,6 +688,7 @@ export function confirmReset(accept) {
   }
 
   elements.resetConfirm.style.display = "none";
+  elements.resetConfirm.setAttribute("aria-hidden", "true");
 
   if (accept) {
     resetScores();

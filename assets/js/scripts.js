@@ -126,7 +126,7 @@ function joinRoom() {
 
   elements.setup.style.display = "none";
   elements.waiting.style.display = "block";
-  elements.resetConfirm.style.display = "none";
+  hideResetConfirm();
   elements.shareRoom.style.display = "none";
 
   roomRef = database.ref(`rooms/${roomId}`);
@@ -223,12 +223,15 @@ function setupRoomListener() {
       // Handle reset requests
       if (room.resetRequest) {
         if (room.resetRequest.playerId !== playerId) {
-          elements.resetConfirm.style.display = "block";
+          elements.resetConfirm.style.display = "flex";
+          elements.resetConfirm.setAttribute("aria-hidden", "false");
         } else {
           elements.resetConfirm.style.display = "none";
+          elements.resetConfirm.setAttribute("aria-hidden", "true");
         }
       } else {
         elements.resetConfirm.style.display = "none";
+        elements.resetConfirm.setAttribute("aria-hidden", "true");
       }
 
       // Get player moves - be very explicit about which is which
@@ -524,7 +527,14 @@ function requestReset() {
   });
 }
 
+function hideResetConfirm() {
+  elements.resetConfirm.style.display = "none";
+  elements.resetConfirm.setAttribute("aria-hidden", "true");
+}
+
 function confirmReset(accept) {
+  hideResetConfirm();
+
   if (accept) {
     playerScore = 0;
     opponentScore = 0;
@@ -563,7 +573,7 @@ function confirmReset(accept) {
   }).catch((error) => {
     console.error("Error declining reset:", error);
   });
-  elements.resetConfirm.style.display = "none";
+  hideResetConfirm();
 }
 
 // Expose functions to HTML

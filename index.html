@@ -15,7 +15,7 @@
         <div class="join-room-container">
             <div class="join-room-interaction-container">
                 <label for="roomId" class="visually-hidden">Room ID</label>
-                <input type="text" id="roomId" placeholder="Enter Room ID" maxlength="6" aria-describedby="room-id-help"
+                <input type="text" id="roomId" placeholder="Room ID" maxlength="6" aria-describedby="room-id-help"
                     autocomplete="off">
                 <div id="room-id-help" class="help-text">Enter 4 characters (letters and numbers)</div>
                 <button onclick="joinRoom()" aria-label="Join existing game room">Join Room</button>
@@ -77,16 +77,17 @@
 
         <div class="reset-container">
             <button class="reset-btn" onclick="requestReset()" aria-label="Reset game scores and start over">Reset Game</button>
-            <div id="reset-confirm">
-                <p>Opponent wants to reset. Accept?</p>
-                <div class="reset-confirm-btns-container">
-                    <button class="reset-confirm-btn-yes" onclick="confirmReset(true)">Yes</button>
-                    <button class="reset-confirm-btn-no" onclick="confirmReset(false)">No</button>
+            <div id="reset-confirm" aria-hidden="true">
+                <div class="reset-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="reset-confirm-title">
+                    <p id="reset-confirm-title">Opponent wants to reset. Accept?</p>
+                    <div class="reset-confirm-btns-container">
+                        <button class="reset-confirm-btn-yes" onclick="confirmReset(true)">Yes</button>
+                        <button class="reset-confirm-btn-no" onclick="confirmReset(false)">No</button>
+                    </div>
                 </div>
             </div>
         </div>
-
-        </div>
+    </main>
 
         <!-- Include local Firebase config -->
         <!-- <script src="assets/js/localConfig.js"></script> -->

@@ -395,10 +395,34 @@ button:disabled {
 
 #reset-confirm {
     display: none;
-    padding: 16px;
-    background: #f5f5f5;
-    border-radius: 8px;
-    border: 1px solid #ddd;
+    position: fixed;
+    inset: 0;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(2px);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.reset-confirm-modal {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+    padding: 24px;
+    max-width: 320px;
+    width: min(320px, 90vw);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+}
+
+.reset-confirm-modal p {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
 }
 
 /* ============================================
