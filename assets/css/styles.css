@@ -487,7 +487,6 @@ button:disabled {
     }
 
     .join-room-interaction-container {
-        /* grid-template-columns: 1fr; */
         justify-items: stretch;
     }
 
