@@ -1,21 +1,19 @@
 // Firebase Initialization
 // TODO: Replace with your actual Firebase config
 // For production, move these to environment variables or server-side configuration
-const firebaseConfig = {
-  // Add your Firebase configuration here
-  // Do not commit actual credentials to version control
-  apiKey: "AIzaSyApmrzJtIDsMpYSjLlP0LeRSAPjH3Ix_rE",
-  authDomain: "jokenpo-5525a.firebaseapp.com",
-  databaseURL: "https://jokenpo-5525a-default-rtdb.firebaseio.com",
-  projectId: "jokenpo-5525a",
-  storageBucket: "jokenpo-5525a.firebasestorage.app",
-  messagingSenderId: "297875424095",
-  appId: "1:297875424095:web:1c44efd898d65b11b76cea",
-  measurementId: "G-ZRP932KL1C"
-};
+// const firebaseConfig = {
+//   apiKey: "@@API_KEY@@",
+//   authDomain: "@@AUTH_DOMAIN@@",
+//   databaseURL: "@@DATABASE_URL@@",
+//   projectId: "@@PROJECT_ID@@",
+//   storageBucket: "@@STORAGE_BUCKET@@",
+//   messagingSenderId: "@@MESSAGING_SENDER_ID@@",
+//   appId: "@@APP_ID@@",
+//   measurementId: "@@MEASUREMENT_ID@@"
+// };
 
 // Firebase Initialization
-// const firebaseConfig = JSON.parse(atob("@@FIREBASE_CONFIG@@"));
+const firebaseConfig = JSON.parse(atob("@@FIREBASE_CONFIG@@"));
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
