@@ -241,25 +241,29 @@ function setupRoomListener() {
         return;
       }
 
-      // Check if player 2 left (only player 1 remains)
+      // Check if player 2 left (only player 1 remains) - but only if game was active
+      // We check if game was active by seeing if we're already past the waiting screen
       if (room.player1 && room.player1.id === state.playerId && (!room.player2 || !room.player2.id)) {
-        // Player 1 needs to go back to waiting for opponent
-        elements.shareRoom.style.display = "block";
-        elements.waiting.style.display = "flex";
-        elements.game.style.display = "none";
-        elements.roomIdDisplay.textContent = state.roomId;
-        
-        // Reset local game state
-        resetScores();
-        resetRoundTracking();
-        updateScores();
-        updateGameStats();
-        elements.result.textContent = "";
-        elements.playerChoice.textContent = "?";
-        elements.opponentChoice.textContent = "?";
-        lastProcessedMovesSignature = null;
-        
-        showToast("Opponent left the room. Waiting for new player...");
+        // Only handle this if the game interface was showing (meaning player 2 was here before)
+        if (elements.game.style.display === "flex") {
+          // Player 1 needs to go back to waiting for opponent
+          elements.shareRoom.style.display = "block";
+          elements.waiting.style.display = "flex";
+          elements.game.style.display = "none";
+          elements.roomIdDisplay.textContent = state.roomId;
+          
+          // Reset local game state
+          resetScores();
+          resetRoundTracking();
+          updateScores();
+          updateGameStats();
+          elements.result.textContent = "";
+          elements.playerChoice.textContent = "?";
+          elements.opponentChoice.textContent = "?";
+          lastProcessedMovesSignature = null;
+          
+          showToast("Opponent left the room. Waiting for new player...");
+        }
         return;
       }
 
