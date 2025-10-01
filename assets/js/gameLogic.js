@@ -210,8 +210,56 @@ function setupRoomListener() {
     try {
       const room = snapshot.val();
       if (!room) {
-        alert("Room was deleted by the host");
-        window.location.reload();
+        // Room was deleted - clean up and return to home
+        if (state.roomRef) {
+          state.roomRef.off();
+          state.roomRef = null;
+        }
+        
+        // Reset UI to home screen
+        elements.setup.style.display = "block";
+        elements.waiting.style.display = "none";
+        elements.game.style.display = "none";
+        elements.shareRoom.style.display = "none";
+        elements.resetConfirm.style.display = "none";
+        elements.resetConfirm.setAttribute("hidden", "");
+        
+        // Reset state
+        state.roomId = "";
+        state.pendingResetRequest = false;
+        state.lastResetResponseTimestamp = null;
+        lastProcessedMovesSignature = null;
+        resetScores();
+        resetRoundTracking();
+        
+        // Clear input
+        if (elements.roomIdInput) {
+          elements.roomIdInput.value = "";
+        }
+        
+        showToast("Room was deleted by the host. Returned to home.");
+        return;
+      }
+
+      // Check if player 2 left (only player 1 remains)
+      if (room.player1 && room.player1.id === state.playerId && (!room.player2 || !room.player2.id)) {
+        // Player 1 needs to go back to waiting for opponent
+        elements.shareRoom.style.display = "block";
+        elements.waiting.style.display = "flex";
+        elements.game.style.display = "none";
+        elements.roomIdDisplay.textContent = state.roomId;
+        
+        // Reset local game state
+        resetScores();
+        resetRoundTracking();
+        updateScores();
+        updateGameStats();
+        elements.result.textContent = "";
+        elements.playerChoice.textContent = "?";
+        elements.opponentChoice.textContent = "?";
+        lastProcessedMovesSignature = null;
+        
+        showToast("Opponent left the room. Waiting for new player...");
         return;
       }
 
@@ -237,15 +285,15 @@ function setupRoomListener() {
 
         if (!isRequester) {
           elements.resetConfirm.style.display = "flex";
-          elements.resetConfirm.setAttribute("aria-hidden", "false");
+          elements.resetConfirm.removeAttribute("hidden");
         } else {
           elements.resetConfirm.style.display = "none";
-          elements.resetConfirm.setAttribute("aria-hidden", "true");
+          elements.resetConfirm.setAttribute("hidden", "");
         }
 
       } else {
         elements.resetConfirm.style.display = "none";
-        elements.resetConfirm.setAttribute("aria-hidden", "true");
+        elements.resetConfirm.setAttribute("hidden", "");
         state.pendingResetRequest = false;
       }
 
@@ -327,15 +375,38 @@ function setupRoomListener() {
 
 /**
  * Handles errors when joining a room.
- * Logs the error to the console, hides the waiting and game sections, and displays an alert to the user.
+ * Logs the error to the console, resets the UI to initial state, and displays a toast notification.
  * @param {Error} error The error that occurred when joining the room.
  */
 function handleRoomError(error) {
   console.error("Room error:", error);
-  elements.setup.style.display = "flex";
+  
+  // Reset UI to initial state
+  elements.setup.style.display = "block";
   elements.waiting.style.display = "none";
   elements.game.style.display = "none";
-  alert(error.message || "Error joining room. Please try again.");
+  elements.shareRoom.style.display = "none";
+  elements.resetConfirm.style.display = "none";
+  elements.resetConfirm.setAttribute("hidden", "");
+  
+  // Clean up room reference if exists
+  if (state.roomRef) {
+    state.roomRef.off();
+    state.roomRef = null;
+  }
+  
+  // Reset state
+  state.roomId = "";
+  state.pendingResetRequest = false;
+  state.lastResetResponseTimestamp = null;
+  
+  // Clear input field
+  if (elements.roomIdInput) {
+    elements.roomIdInput.value = "";
+  }
+  
+  // Show error message via toast
+  showToast(error.message || "Error joining room. Please try again.");
 }
 
 /**
@@ -473,7 +544,7 @@ export function joinRoom() {
   elements.setup.style.display = "none";
   elements.waiting.style.display = "flex";
   elements.resetConfirm.style.display = "none";
-  elements.resetConfirm.setAttribute("aria-hidden", "true");
+  elements.resetConfirm.setAttribute("hidden", "");
   elements.shareRoom.style.display = "none";
 
   state.pendingResetRequest = false;
@@ -508,8 +579,9 @@ export function joinRoom() {
         };
       }
 
+      // Room is full - abort transaction
       if (currentData.player2 && currentData.player2.id) {
-        throw new Error("Room is full! Please try another room.");
+        return; // Abort transaction by returning undefined
       }
 
       if (currentData.player1.id === state.playerId) {
@@ -525,14 +597,20 @@ export function joinRoom() {
       currentData.lastUpdated = firebase.database.ServerValue.TIMESTAMP;
       return currentData;
     },
-    (error, committed) => {
+    (error, committed, snapshot) => {
       if (error) {
         handleRoomError(error);
         return;
       }
 
       if (!committed) {
-        handleRoomError(new Error("Failed to join room"));
+        // Check if room is full
+        const data = snapshot.val();
+        if (data && data.player2 && data.player2.id) {
+          handleRoomError(new Error("Room is full! Please try another room."));
+        } else {
+          handleRoomError(new Error("Failed to join room. Please try again."));
+        }
         return;
       }
 
@@ -688,7 +766,7 @@ export function confirmReset(accept) {
   }
 
   elements.resetConfirm.style.display = "none";
-  elements.resetConfirm.setAttribute("aria-hidden", "true");
+  elements.resetConfirm.setAttribute("hidden", "");
 
   if (accept) {
     resetScores();
@@ -772,3 +850,96 @@ export function confirmReset(accept) {
       console.error("Error declining reset:", error);
     });
 }
+
+/**
+ * Removes the current player from the room and resets the opponent to waiting state.
+ * This is called when a player leaves/refreshes the page.
+ */
+async function leaveRoom() {
+  if (!state.roomRef || !state.roomId) {
+    return;
+  }
+
+  try {
+    const snapshot = await state.roomRef.once("value");
+    const room = snapshot.val();
+    
+    if (!room) {
+      return;
+    }
+
+    const isPlayer1 = room.player1 && room.player1.id === state.playerId;
+    const isPlayer2 = room.player2 && room.player2.id === state.playerId;
+
+    if (isPlayer1) {
+      // Player 1 (host) is leaving - delete the entire room
+      await state.roomRef.remove();
+      console.log("Player 1 left - room deleted");
+    } else if (isPlayer2) {
+      // Player 2 is leaving - reset their slot and clear game state
+      await Promise.all([
+        state.roomRef.child("player2").set({
+          id: null,
+          move: null,
+          timestamp: null,
+        }),
+        state.roomRef.child("player1/move").set(null),
+        state.roomRef.update({
+          round: 0,
+          scores: { player1: 0, player2: 0 },
+          resetRequest: null,
+          resetResponse: null,
+          resultProcessed: false,
+          lastProcessedSignature: null,
+          lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+        }),
+      ]);
+      console.log("Player 2 left - room reset for player 1");
+    }
+
+    // Clean up local state
+    state.roomRef.off();
+    state.roomRef = null;
+    state.roomId = "";
+    state.pendingResetRequest = false;
+    state.lastResetResponseTimestamp = null;
+    lastProcessedMovesSignature = null;
+  } catch (error) {
+    console.error("Error leaving room:", error);
+  }
+}
+
+/**
+ * Sets up beforeunload event to confirm if user wants to leave the game.
+ */
+function setupBeforeUnloadHandler() {
+  window.addEventListener("beforeunload", (event) => {
+    // Only show confirmation if user is in an active game
+    if (state.roomRef && state.roomId && elements.game.style.display === "flex") {
+      // Prevent the default behavior
+      event.preventDefault();
+      // Chrome requires returnValue to be set
+      event.returnValue = "";
+      // Note: Modern browsers show their own generic message like:
+      // "Leave site? Changes you made may not be saved" or
+      // "Reload site? Changes that you made may not be saved"
+    }
+  });
+
+  // Handle actual page unload - synchronous cleanup
+  window.addEventListener("unload", () => {
+    if (state.roomRef && state.roomId) {
+      leaveRoom();
+    }
+  });
+
+  // Better alternative: use pagehide event (more reliable)
+  window.addEventListener("pagehide", () => {
+    if (state.roomRef && state.roomId) {
+      leaveRoom();
+    }
+  });
+}
+
+// Initialize beforeunload handler
+setupBeforeUnloadHandler();

@@ -59,12 +59,12 @@ input:focus {
 }
 
 #roomId {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: bold;
     color: #1565c0;
     padding: 8px;
-    background: white;
     border-radius: 8px;
+    text-transform: uppercase;
 }
 
 /* ============================================
@@ -80,7 +80,7 @@ button {
     background: #4285F4;
     color: white;
     transition: all 0.2s ease;
-    font-weight: 500;
+    font-weight: bold;
     min-height: 54px;
 }
 
