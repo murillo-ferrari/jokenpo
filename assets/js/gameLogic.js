@@ -62,10 +62,6 @@ function updateButtonState(currentPlayerMove) {
     const shouldDisable = hasCurrentPlayerMoved || state.isProcessingMove;
     const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
 
-    // console.log(
-    //   `Updating button state for ${state.isPlayer1 ? "Player 1" : "Player 2"} - Player moved: ${hasCurrentPlayerMoved}, Processing: ${state.isProcessingMove}, Should disable: ${shouldDisable}`
-    // );
-
     buttons.forEach((btn) => {
       if (!btn) return;
 
