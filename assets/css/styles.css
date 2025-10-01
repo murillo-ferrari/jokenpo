@@ -145,7 +145,6 @@ button:disabled {
 
 .join-room-interaction-container {
     display: grid;
-    /* grid-template-columns: minmax(0, 1fr) auto; */
     align-items: center;
     gap: 8px;
     justify-content: center;
