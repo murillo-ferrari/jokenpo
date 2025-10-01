@@ -1,0 +1,8 @@
+// Ignore Visual Studio Code settings
+.vscode
+
+// Ignore local Firebase config
+assets/js/localConfig.js
+
+// Ignore old scripts file
+assets/js/script.js

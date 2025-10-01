@@ -9,64 +9,94 @@
 </head>
 
 <body>
-    <div id="firebase-error"></div>
     <h1>🎮 Online Jokenpo</h1>
 
-    <div id="setup">
-        <input type="text" id="roomId" placeholder="Enter Room ID">
-        <button onclick="joinRoom()">Join Room</button>
-        <button onclick="createRoom()" style="background:#0F9D58">Create New Room</button>
+    <main id="setup" role="main">
+        <div class="join-room-container">
+            <div class="join-room-interaction-container">
+                <label for="roomId" class="visually-hidden">Room ID</label>
+                <input type="text" id="roomId" placeholder="Enter Room ID" maxlength="6" aria-describedby="room-id-help"
+                    autocomplete="off">
+                <div id="room-id-help" class="help-text">Enter 4 characters (letters and numbers)</div>
+                <button onclick="joinRoom()" aria-label="Join existing game room">Join Room</button>
+            </div>
+        </div>  
+            
+        <div class="create-room-btn-container">
+            <button class="create-room-btn" onclick="createRoom()" aria-label="Create new game room">Create New Room</button>
+        </div>
+    </main>
+
+    <div id="waiting" style="display: none" role="status" aria-live="polite">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        Waiting for opponent...
     </div>
 
-    <div id="waiting" style="display: none">Waiting for opponent to join...</div>
+    <div id="toast" role="status" aria-live="polite" class="toast" hidden></div>
 
-    <div id="share-room">
+    <section id="share-room" role="region" aria-label="Share room with friend">
         <p>Share this room ID with a friend:</p>
-        <div id="room-id-display"></div>
-        <button id="copy-btn" onclick="copyRoomId()">Copy Room ID</button>
-    </div>
+        <div class="share-room-container">
+            <div id="room-id-display" aria-label="Room ID to share"></div>
+            <button id="copy-btn" onclick="copyRoomId()" aria-label="Copy room ID to clipboard">Copy Room ID</button>
+        </div>
+    </section>
 
-    <div id="game">
+    <main id="game" role="main">
         <h2>Make your move:</h2>
-        <div>
-            <button id="rock-btn" onclick="playMove('rock')">✊ Rock</button>
-            <button id="paper-btn" onclick="playMove('paper')">✋ Paper</button>
-            <button id="scissors-btn" onclick="playMove('scissors')">✌️ Scissors</button>
+        <div class="move-buttons" role="group" aria-label="Game moves">
+            <button id="rock-btn" onclick="playMove('rock')" aria-label="Play Rock - crushes scissors"
+                class="move-button">✊ Rock</button>
+            <button id="paper-btn" onclick="playMove('paper')" aria-label="Play Paper - covers rock"
+                class="move-button">✋ Paper</button>
+            <button id="scissors-btn" onclick="playMove('scissors')" aria-label="Play Scissors - cuts paper"
+                class="move-button">✌️ Scissors</button>
         </div>
 
-        <div class="choice-display">
-            <span id="player-choice">?</span>
-            <span style="font-size:24px">vs</span>
-            <span id="opponent-choice">?</span>
+        <div class="choice-display" role="region" aria-label="Game results">
+            <span id="player-choice" aria-label="Your choice">?</span>
+            <span class="vs-text" aria-hidden="true">vs</span>
+            <span id="opponent-choice" aria-label="Opponent's choice">?</span>
         </div>
 
         <div id="result"></div>
 
-        <div class="scores">
-            <span style="color:#4285F4">You: <span id="player-score">0</span></span> |
-            <span style="color:#DB4437">Opponent: <span id="opponent-score">0</span></span>
+        <section class="scores" role="region" aria-label="Game statistics">
+            <div class="score-display">
+                <span class="player-score">You: <span id="player-score" aria-label="Your score"> 0</span></span>
+                <span class="separator" aria-hidden="true">|</span>
+                <span class="opponent-score">Opponent: <span id="opponent-score" aria-label="Opponent score">
+                        0</span></span>
+            </div>
             <div class="game-stats">
-                <span>Rounds: <span id="total-rounds">0</span></span> |
-                <span>Ties: <span id="total-ties">0</span></span>
+                <div class="rounds">Rounds: <span id="total-rounds" aria-label="Total rounds played"> 0</span></div>
+                <span class="separator" aria-hidden="true">|</span>
+                <div class="ties">Ties: <span id="total-ties" aria-label="Number of ties"> 0</span></div>
+            </div>
+        </section>
+
+        <div class="reset-container">
+            <button class="reset-btn" onclick="requestReset()" aria-label="Reset game scores and start over">Reset Game</button>
+            <div id="reset-confirm">
+                <p>Opponent wants to reset. Accept?</p>
+                <div class="reset-confirm-btns-container">
+                    <button class="reset-confirm-btn-yes" onclick="confirmReset(true)">Yes</button>
+                    <button class="reset-confirm-btn-no" onclick="confirmReset(false)">No</button>
+                </div>
             </div>
         </div>
 
-        <button onclick="requestReset()" style="background:#DB4437; margin-top:30px">Reset Game</button>
-        <div id="reset-confirm"
-            style="display:none; margin-top:10px; padding:10px; background:#f0f0f0; border-radius:5px;">
-            <p>Opponent wants to reset. Accept?</p>
-            <button onclick="confirmReset(true)" style="background:#0F9D58; margin-right:10px;">Yes</button>
-            <button onclick="confirmReset(false)" style="background:#DB4437">No</button>
         </div>
-    </div>
 
+        <!-- Include local Firebase config -->
+        <!-- <script src="assets/js/localConfig.js"></script> -->
 
-    <!-- Load Firebase FIRST -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+        <!-- Load Firebase -->
+        <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
 
-    <!-- Game Logic -->
-    <script src="assets/js/scripts.js"></script>
+        <!-- Game Logic -->
+        <script type="module" src="assets/js/main.js"></script>
 </body>
 
 </html>

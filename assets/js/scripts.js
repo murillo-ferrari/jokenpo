@@ -1,4 +1,18 @@
 // Firebase Initialization
+// TODO: Replace with your actual Firebase config
+// For production, move these to environment variables or server-side configuration
+// const firebaseConfig = {
+//   apiKey: "@@API_KEY@@",
+//   authDomain: "@@AUTH_DOMAIN@@",
+//   databaseURL: "@@DATABASE_URL@@",
+//   projectId: "@@PROJECT_ID@@",
+//   storageBucket: "@@STORAGE_BUCKET@@",
+//   messagingSenderId: "@@MESSAGING_SENDER_ID@@",
+//   appId: "@@APP_ID@@",
+//   measurementId: "@@MEASUREMENT_ID@@"
+// };
+
+// Firebase Initialization
 const firebaseConfig = JSON.parse(atob("@@FIREBASE_CONFIG@@"));
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
@@ -11,7 +25,8 @@ let roomRef;
 let currentRound = 0;
 let playerScore = 0;
 let opponentScore = 0;
-let buttonsDisabled = false;
+let lastProcessedRound = -1; // Track which round we last processed
+let isProcessingMove = false; // Prevent duplicate move submissions
 
 // DOM Elements
 const elements = {
@@ -97,7 +112,6 @@ function copyRoomId() {
 function createRoom() {
   roomId = Math.random().toString(36).slice(2, 6).toUpperCase();
   elements.roomIdInput.value = roomId;
-  // Show the room ID display
   elements.shareRoom.style.display = "block";
   elements.roomIdDisplay.textContent = roomId;
   joinRoom();
@@ -113,7 +127,7 @@ function joinRoom() {
   elements.setup.style.display = "none";
   elements.waiting.style.display = "block";
   elements.resetConfirm.style.display = "none";
-  elements.shareRoom.style.display = "none"; // Ensure share section is hidden initially
+  elements.shareRoom.style.display = "none";
 
   roomRef = database.ref(`rooms/${roomId}`);
 
@@ -121,7 +135,6 @@ function joinRoom() {
     (currentData) => {
       if (!currentData) {
         isPlayer1 = true;
-        // Show share room section only for the room creator
         elements.shareRoom.style.display = "block";
         elements.roomIdDisplay.textContent = roomId;
         return {
@@ -194,22 +207,18 @@ function setupRoomListener() {
         return;
       }
 
+      // Wait for both players
       if (!room.player1 || !room.player2 || !room.player2.id) {
         return;
       }
 
       // Hide share room section when room is full
       elements.shareRoom.style.display = "none";
-
       elements.waiting.style.display = "none";
       elements.game.style.display = "block";
 
-      // Update scores
-      playerScore = isPlayer1 ? room.scores.player1 : room.scores.player2;
-      opponentScore = isPlayer1 ? room.scores.player2 : room.scores.player1;
-      currentRound = room.round; // Update currentRound from Firebase
-      updateScores();
-      updateGameStats();
+      // Update local round from server
+      currentRound = room.round;
 
       // Handle reset requests
       if (room.resetRequest) {
@@ -222,82 +231,106 @@ function setupRoomListener() {
         elements.resetConfirm.style.display = "none";
       }
 
-      // Get current player moves
-      const myMove = isPlayer1 ? room.player1.move : room.player2.move;
-      const theirMove = isPlayer1 ? room.player2.move : room.player1.move;
+      // Get player moves - be very explicit about which is which
+      const player1Move = room.player1.move;
+      const player2Move = room.player2.move;
+      
+      // Determine THIS player's move based on whether they are player1 or player2
+      let currentPlayerMove, opponentPlayerMove;
+      if (isPlayer1) {
+        currentPlayerMove = player1Move;
+        opponentPlayerMove = player2Move;
+      } else {
+        currentPlayerMove = player2Move;
+        opponentPlayerMove = player1Move;
+      }
 
-      // Update UI based on game state
-      if (room.player1.move && room.player2.move) {
-        if (room.round > currentRound) {
-          calculateResults(room.player1.move, room.player2.move);
+      console.log(`🔄 State update - ${isPlayer1 ? 'PLAYER 1 (HOST)' : 'PLAYER 2 (GUEST)'} - myMove: ${currentPlayerMove}, oppMove: ${opponentPlayerMove}, round: ${currentRound}`);
+
+      // Sync scores from database to prevent discrepancies
+      playerScore = isPlayer1 ? room.scores.player1 : room.scores.player2;
+      opponentScore = isPlayer1 ? room.scores.player2 : room.scores.player1;
+      updateScores();
+      updateGameStats();
+
+      // Process round if both players have moved and we haven't processed this round yet
+      if (player1Move && player2Move) {
+        if (currentRound > lastProcessedRound) {
+          lastProcessedRound = currentRound;
+          calculateResults(player1Move, player2Move, room);
         } else {
-          // Only show "Calculating..." if we haven't processed the result yet
-          if (elements.result.textContent !== "It's a tie!") {
-            elements.result.textContent = "Calculating...";
-          }
+          // Already processed, just show the results
+          displayMoves(player1Move, player2Move);
         }
       } else {
-        elements.playerChoice.textContent = myMove ? "✓" : "?";
-        elements.opponentChoice.textContent = theirMove ? "✓" : "?";
-        // Only clear result if we're not showing a tie
-        if (elements.result.textContent !== "It's a tie!") {
+        // Waiting for moves
+        elements.playerChoice.textContent = currentPlayerMove ? "✓" : "?";
+        elements.opponentChoice.textContent = opponentPlayerMove ? "✓" : "?";
+        
+        // Clear result if we're starting a new round
+        if (!player1Move && !player2Move) {
           elements.result.textContent = "";
         }
       }
 
-      // Update button states
-      updateButtonState(myMove, theirMove);
+      // Update button states based ONLY on whether THIS player has moved
+      // Only disable buttons for THIS specific player if THEY have moved
+      updateButtonState(currentPlayerMove);
     } catch (error) {
       console.error("Listener error:", error);
     }
   });
 }
 
-function updateButtonState(myMove, theirMove) {
+function updateButtonState(currentPlayerMove) {
   try {
-    const shouldDisable = !!myMove; // Only disable if current player has moved
-    setButtonsDisabled(shouldDisable);
-
+    // Only disable if THIS specific player has moved OR we're processing a move
+    const hasCurrentPlayerMoved = !!currentPlayerMove;
+    const shouldDisable = hasCurrentPlayerMoved || isProcessingMove;
     const buttons = [elements.rockBtn, elements.paperBtn, elements.scissorsBtn];
+    
+    console.log(`Updating button state for ${isPlayer1 ? 'Player 1' : 'Player 2'} - Player moved: ${hasCurrentPlayerMoved}, Processing: ${isProcessingMove}, Should disable: ${shouldDisable}`);
+    
     buttons.forEach((btn) => {
       if (!btn) return;
-
-      if (myMove) {
-        btn.style.opacity = "0.5";
-        btn.style.cursor = "not-allowed";
-      } else {
-        btn.style.opacity = "1";
-        btn.style.cursor = "pointer";
-      }
+      
+      btn.disabled = shouldDisable;
+      btn.style.opacity = shouldDisable ? "0.5" : "1";
+      btn.style.cursor = shouldDisable ? "not-allowed" : "pointer";
     });
   } catch (error) {
     console.error("Button state error:", error);
   }
 }
 
-function setButtonsDisabled(disabled) {
-  buttonsDisabled = disabled;
-  if (elements.rockBtn) elements.rockBtn.disabled = disabled;
-  if (elements.paperBtn) elements.paperBtn.disabled = disabled;
-  if (elements.scissorsBtn) elements.scissorsBtn.disabled = disabled;
-}
-
 // Game Actions
 function playMove(move) {
-  if (buttonsDisabled) {
-    console.log("Buttons are disabled - ignoring move");
+  // Prevent duplicate submissions
+  if (isProcessingMove) {
+    console.log("Already processing a move - ignoring");
+    return;
+  }
+
+  // Check if button is disabled
+  const btn = elements[`${move}Btn`];
+  if (btn && btn.disabled) {
+    console.log("Button is disabled - ignoring move");
     return;
   }
 
   console.log(`Playing move: ${move}`);
+
+  // Set processing flag and immediately disable buttons
+  isProcessingMove = true;
+  updateButtonState(true);
+  elements.playerChoice.textContent = "✓";
 
   roomRef
     .once("value")
     .then((snapshot) => {
       const room = snapshot.val();
       if (!room) {
-        console.error("Room not found");
-        return;
+        throw new Error("Room not found");
       }
 
       // Verify player is still in the room
@@ -305,94 +338,169 @@ function playMove(move) {
       const isStillPlayer2 = room.player2 && room.player2.id === playerId;
 
       if (!isStillPlayer1 && !isStillPlayer2) {
-        console.error("Player not found in room");
-        alert("You're no longer in this room. Please refresh.");
-        return;
+        throw new Error("You're no longer in this room. Please refresh.");
       }
 
-      const updates = {};
+      // Check if player already made a move this round
       const playerPath = isStillPlayer1 ? "player1" : "player2";
-      updates[`${playerPath}/move`] = move;
-      updates["lastUpdated"] = firebase.database.ServerValue.TIMESTAMP;
+      if (room[playerPath].move) {
+        console.log("Move already submitted for this round");
+        isProcessingMove = false;
+        return Promise.resolve();
+      }
 
-      return roomRef.update(updates);
-    })
-    .then(() => {
-      console.log("Move submitted successfully");
-      elements.playerChoice.textContent = "✓";
-      setButtonsDisabled(true);
-
-      // Check if both players have moved
-      return roomRef.once("value");
-    })
-    .then((snapshot) => {
-      const room = snapshot.val();
-      if (room.player1.move && room.player2.move) {
-        console.log("Both players moved - advancing round");
+      // Submit move using transaction to prevent race conditions
+      return roomRef.child(playerPath).transaction((playerData) => {
+        if (!playerData) return playerData;
+        
+        // Only set move if it's not already set
+        if (!playerData.move) {
+          playerData.move = move;
+          playerData.timestamp = firebase.database.ServerValue.TIMESTAMP;
+        }
+        return playerData;
+      }).then((result) => {
+        if (!result.committed) {
+          throw new Error("Failed to submit move");
+        }
+        
+        console.log("Move submitted successfully");
+        
+        // Update last updated timestamp
         return roomRef.update({
-          round: room.round + 1,
           lastUpdated: firebase.database.ServerValue.TIMESTAMP,
         });
-      }
+      }).then(() => {
+        // Check if both players have now moved and advance round
+        return roomRef.once("value");
+      }).then((updatedSnapshot) => {
+        const updatedRoom = updatedSnapshot.val();
+        if (updatedRoom.player1.move && updatedRoom.player2.move) {
+          // Both players have moved - use transaction to safely advance round
+          console.log("Both players moved - attempting to advance round");
+          return roomRef.child('round').transaction((roundValue) => {
+            if (typeof roundValue !== "number") {
+              return roundValue;
+            }
+
+            // Only advance if the server-side round still matches this client's view
+            if (roundValue === room.round) {
+              return roundValue + 1;
+            }
+
+            return roundValue;
+          }).then((result) => {
+            if (result.committed && result.snapshot.val() === room.round + 1) {
+              console.log(`Round advanced to ${result.snapshot.val()}`);
+              return roomRef.update({
+                lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+              });
+            }
+
+            console.log("Round already advanced by another client - skipping increment");
+            return null;
+          });
+        }
+      }).finally(() => {
+        isProcessingMove = false;
+      });
     })
     .catch((error) => {
       console.error("Move error:", error);
-      alert("Error submitting move. Please try again.");
-      setButtonsDisabled(false);
+      alert(error.message || "Error submitting move. Please try again.");
+      // Re-enable buttons on error
+      isProcessingMove = false;
+      updateButtonState(false);
+      elements.playerChoice.textContent = "?";
     });
 }
 
-function calculateResults(p1Move, p2Move) {
-  // Display moves
-  elements.playerChoice.textContent = emojis[isPlayer1 ? p1Move : p2Move];
-  elements.opponentChoice.textContent = emojis[isPlayer1 ? p2Move : p1Move];
+function displayMoves(player1Move, player2Move) {
+  elements.playerChoice.textContent = emojis[isPlayer1 ? player1Move : player2Move];
+  elements.opponentChoice.textContent = emojis[isPlayer1 ? player2Move : player1Move];
+}
 
+function calculateResults(player1Move, player2Move, room) {
+  // Display moves
+  displayMoves(player1Move, player2Move);
+
+  // Get current scores from server - this is the source of truth
+  const currentPlayer1Score = room.scores.player1 || 0;
+  const currentPlayer2Score = room.scores.player2 || 0;
+  
+  console.log(`Current scores from server - P1: ${currentPlayer1Score}, P2: ${currentPlayer2Score}`);
+  
   // Determine winner
   let result = "It's a tie!";
-  if (p1Move !== p2Move) {
+  let newPlayer1Score = currentPlayer1Score;
+  let newPlayer2Score = currentPlayer2Score;
+  
+  if (player1Move !== player2Move) {
     const winConditions = {
       rock: "scissors",
       paper: "rock",
       scissors: "paper",
     };
 
-    const playerWon = winConditions[p1Move] === p2Move;
-    result = playerWon ? "You win! 🎉" : "Opponent wins!";
-    if (playerWon === isPlayer1) playerScore++;
-    else opponentScore++;
+    const player1Won = winConditions[player1Move] === player2Move;
+    
+    // Increment the winner's score by 1
+    if (player1Won) {
+      newPlayer1Score = currentPlayer1Score + 1;
+      result = isPlayer1 ? "You win! 🎉" : "Opponent wins!";
+    } else {
+      newPlayer2Score = currentPlayer2Score + 1;
+      result = isPlayer1 ? "Opponent wins!" : "You win! 🎉";
+    }
   }
 
+  console.log(`New calculated scores - P1: ${newPlayer1Score}, P2: ${newPlayer2Score}`);
+
   elements.result.textContent = result;
+
+  // Update LOCAL display scores from THIS player's perspective
+  playerScore = isPlayer1 ? newPlayer1Score : newPlayer2Score;
+  opponentScore = isPlayer1 ? newPlayer2Score : newPlayer1Score;
+  
   updateScores();
   updateGameStats();
 
-  // Update scores in database
-  updateRoom({
-    scores: {
-      player1: isPlayer1 ? playerScore : opponentScore,
-      player2: isPlayer1 ? opponentScore : playerScore,
-    },
-    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
-  });
-
-  // Reset for next round
-  setTimeout(() => {
-    updateRoom({
-      "player1/move": null,
-      "player2/move": null,
-      lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+  // ONLY Player 1 (host) updates the database to prevent duplicate scoring
+  if (isPlayer1) {
+    console.log("Player 1 updating scores in database");
+    roomRef.update({
+      'scores/player1': newPlayer1Score,
+      'scores/player2': newPlayer2Score
+    }).then(() => {
+      console.log("Scores updated successfully by Player 1");
+    }).catch((error) => {
+      console.error("Error updating scores:", error);
     });
-    elements.result.textContent = "";
-    elements.playerChoice.textContent = "?";
-    elements.opponentChoice.textContent = "?";
-    setButtonsDisabled(false);
+  } else {
+    console.log("Player 2 - scores will be updated by Player 1");
+  }
+
+  // Reset moves for next round after delay
+  setTimeout(() => {
+    const player1MoveRef = roomRef.child('player1/move');
+    const player2MoveRef = roomRef.child('player2/move');
+    
+    Promise.all([
+      player1MoveRef.set(null),
+      player2MoveRef.set(null),
+      roomRef.update({ lastUpdated: firebase.database.ServerValue.TIMESTAMP })
+    ]).then(() => {
+      // UI will be updated by the listener
+      console.log("Moves reset for next round");
+    }).catch((error) => {
+      console.error("Error resetting moves:", error);
+    });
   }, 3000);
 }
 
 function updateScores() {
   if (elements.playerScore) elements.playerScore.textContent = playerScore;
-  if (elements.opponentScore)
-    elements.opponentScore.textContent = opponentScore;
+  if (elements.opponentScore) elements.opponentScore.textContent = opponentScore;
 }
 
 function updateGameStats() {
@@ -403,12 +511,16 @@ function updateGameStats() {
 
 // Reset Functions
 function requestReset() {
-  roomRef.update({
-    resetRequest: {
-      playerId: playerId,
-      timestamp: firebase.database.ServerValue.TIMESTAMP,
-    },
-    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+  roomRef.child('resetRequest').set({
+    playerId: playerId,
+    timestamp: firebase.database.ServerValue.TIMESTAMP,
+  }).then(() => {
+    return roomRef.update({
+      lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+    });
+  }).catch((error) => {
+    console.error("Error requesting reset:", error);
+    alert("Error requesting reset. Please try again.");
   });
 }
 
@@ -417,28 +529,39 @@ function confirmReset(accept) {
     playerScore = 0;
     opponentScore = 0;
     currentRound = 0;
+    lastProcessedRound = -1;
     updateScores();
     updateGameStats();
 
-    roomRef.update({
+    const resetData = {
       scores: { player1: 0, player2: 0 },
       resetRequest: null,
-      "player1/move": null,
-      "player2/move": null,
       round: 0,
       lastUpdated: firebase.database.ServerValue.TIMESTAMP,
-    });
+    };
 
-    elements.result.textContent = "";
-    elements.playerChoice.textContent = "?";
-    elements.opponentChoice.textContent = "?";
-    setButtonsDisabled(false);
+    Promise.all([
+      roomRef.child('player1/move').set(null),
+      roomRef.child('player2/move').set(null),
+      roomRef.update(resetData)
+    ]).then(() => {
+      elements.result.textContent = "";
+      elements.playerChoice.textContent = "?";
+      elements.opponentChoice.textContent = "?";
+      updateButtonState(false);
+    }).catch((error) => {
+      console.error("Error resetting game:", error);
+      alert("Error resetting game. Please try again.");
+    });
     return;
   }
 
-  roomRef.update({
-    resetRequest: null,
-    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+  roomRef.child('resetRequest').set(null).then(() => {
+    return roomRef.update({
+      lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+    });
+  }).catch((error) => {
+    console.error("Error declining reset:", error);
   });
   elements.resetConfirm.style.display = "none";
 }
