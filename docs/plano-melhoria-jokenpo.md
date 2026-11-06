@@ -164,17 +164,17 @@ rooms/{code}
     player2: { uid, connected, seenAt, joinedAt }
   matches/{matchId}                 # reset = nova partida; histórico preservado
     rounds/{n}/
-      player1: { commit, reveal?: { move, nonce } }
-      player2: { commit, reveal?: { move, nonce } }
+      player1: { commit, reveal?: { move, nonce, at } }
+      player2: { commit, reveal?: { move, nonce, at } }
   currentMatch: matchId
   resetRequest?: { by, at }
 ```
 
 **Commit-reveal:** resolve a trapaça (S1) sem Cloud Functions, que exigiriam o plano pago Blaze.
 
-1. Cada jogador grava `commit = SHA-256(move + nonce)`. O adversário não consegue saber a jogada a partir do hash.
+1. Cada jogador grava `commit = SHA-256("move:nonce")`. O adversário não consegue saber a jogada a partir do hash.
 2. As regras só permitem gravar `reveal` quando os dois `commit` já existem.
-3. Cada cliente confere `hash(reveal) === commit` do adversário. Se não bater, ou se o adversário não revelar dentro de um prazo, a rodada é perdida por W.O.
+3. Cada cliente confere `hash(reveal) === commit` do adversário. Se não bater, a rodada vai para o adversário na hora. Se um jogador não revelar em até 15 s depois do outro, perde por W.O. O prazo é medido pelo `at` do reveal, que as regras obrigam a ser o horário do servidor; assim, o resultado de uma rodada concluída nunca muda depois de mostrado.
 
 **O que esse modelo elimina:**
 
@@ -221,14 +221,22 @@ A antiga Fase 0, uma correção emergencial no código atual, foi descartada: a 
 
 **Atenção:** as regras novas **não** devem ir para produção antes de o app novo ser publicado. Elas rejeitam o formato de dados do app atual e o quebrariam. O deploy das regras (`npx firebase deploy --only database`) acontece junto com o merge da reescrita na `main`.
 
-### Fase 2: domínio com testes (≈½ dia)
+### Fase 2: domínio com testes (≈½ dia) ✅ concluída em 06/11/2026
 
-- [ ] `types.ts`: `Move`, `PlayerSlot`, `RoundRecord`, `MatchSummary`, `RoomCode` (tipo nominal).
-- [ ] `rules.ts`: `resolveRound`, com tabela de vitórias tipada (`Record<Move, Move>`).
-- [ ] `match.ts`: `summarize(rounds)` → `{ scores, ties, currentRound, phase, lastResult }`.
-- [ ] `roomCode.ts`: `generate(random)`, com aleatoriedade injetada para teste, e `parse(input)` → `RoomCode | erro`.
-- [ ] `commitment.ts`: `verifyReveal(commit, reveal, hasher)`.
-- [ ] Testes cobrindo as 9 combinações de jogada, rodada incompleta, reveal inválido, W.O. e normalização do código.
+- [x] `types.ts`: `Move`, `PlayerSlot`, `RoundRecord`, `SlotEntry`, `Reveal`, `RoomCode`/`MatchId`/`PlayerId` (tipos nominais).
+- [x] `rules.ts`: `resolveRound`, com tabela de vitórias tipada (`Record<Move, Move>`).
+- [x] `match.ts`: `evaluateRound` e `summarize(rounds, { now })` → `{ scores, ties, history, current }`, mais `generateMatchId`.
+- [x] `roomCode.ts`: `generateRoomCode(random)`, com aleatoriedade injetada, e `parseRoomCode(input)`, que aceita minúsculas, espaços e hífens.
+- [x] `commitment.ts`: `commitFor` e `verifyReveal`, síncronos, com `@noble/hashes`. O hash síncrono mantém `summarize` como função pura.
+- [x] Regras do banco: `reveal.at` obrigatório e igual ao horário do servidor.
+- [x] 46 testes de domínio:
+  - as 9 combinações de jogada;
+  - fases da rodada em aberto;
+  - W.O., inclusive reveal atrasado e no limite exato do prazo;
+  - reveal inválido;
+  - código de sala, inclusive os caracteres que travavam o app antigo (B6, B7);
+  - hash conferido com `node:crypto`;
+  - alfabeto do código conferido com a regex das regras do banco.
 
 ### Fase 3: aplicação e infraestrutura (≈1 dia)
 

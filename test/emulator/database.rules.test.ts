@@ -188,20 +188,26 @@ describe('commit-reveal', () => {
   it('não revela antes dos dois commits', async () => {
     await seedFullRoom();
     await seed(`${round(0)}/player1/commit`, HASH_A);
-    await assertFails(db('alice').ref(`${round(0)}/player1/reveal`).set({ move: 'rock', nonce: NONCE }));
+    await assertFails(db('alice').ref(`${round(0)}/player1/reveal`).set({ move: 'rock', nonce: NONCE, at: TIMESTAMP }));
   });
 
   it('revela depois dos dois commits, uma única vez', async () => {
     await seedFullRoom();
     await seed(round(0), { player1: { commit: HASH_A }, player2: { commit: HASH_B } });
-    await assertSucceeds(db('alice').ref(`${round(0)}/player1/reveal`).set({ move: 'rock', nonce: NONCE }));
-    await assertFails(db('alice').ref(`${round(0)}/player1/reveal`).set({ move: 'paper', nonce: NONCE }));
+    await assertSucceeds(db('alice').ref(`${round(0)}/player1/reveal`).set({ move: 'rock', nonce: NONCE, at: TIMESTAMP }));
+    await assertFails(db('alice').ref(`${round(0)}/player1/reveal`).set({ move: 'paper', nonce: NONCE, at: TIMESTAMP }));
+  });
+
+  it('o horário do reveal tem de ser o do servidor', async () => {
+    await seedFullRoom();
+    await seed(round(0), { player1: { commit: HASH_A }, player2: { commit: HASH_B } });
+    await assertFails(db('alice').ref(`${round(0)}/player1/reveal`).set({ move: 'rock', nonce: NONCE, at: 1 }));
   });
 
   it('rejeita jogada inválida no reveal', async () => {
     await seedFullRoom();
     await seed(round(0), { player1: { commit: HASH_A }, player2: { commit: HASH_B } });
-    await assertFails(db('alice').ref(`${round(0)}/player1/reveal`).set({ move: 'lizard', nonce: NONCE }));
+    await assertFails(db('alice').ref(`${round(0)}/player1/reveal`).set({ move: 'lizard', nonce: NONCE, at: TIMESTAMP }));
   });
 
   it('só aceita jogadas na partida atual', async () => {

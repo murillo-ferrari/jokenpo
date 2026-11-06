@@ -59,12 +59,15 @@
                   },
                   "reveal": {
                     ".write": "auth != null && !data.exists() && root.child('rooms/' + $code + '/players/' + $slot + '/uid').val() === auth.uid && root.child('rooms/' + $code + '/currentMatch').val() === $matchId && data.parent().parent().child('player1/commit').exists() && data.parent().parent().child('player2/commit').exists()",
-                    ".validate": "newData.hasChildren(['move', 'nonce'])",
+                    ".validate": "newData.hasChildren(['move', 'nonce', 'at'])",
                     "move": {
                       ".validate": "newData.val() === 'rock' || newData.val() === 'paper' || newData.val() === 'scissors'"
                     },
                     "nonce": {
                       ".validate": "newData.isString() && newData.val().matches(/^[0-9a-f]{32}$/)"
+                    },
+                    "at": {
+                      ".validate": "newData.isNumber() && newData.val() === now"
                     },
                     "$other": { ".validate": false }
                   },

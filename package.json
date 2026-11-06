@@ -19,6 +19,7 @@
     "test:emulator": "firebase emulators:exec --only auth,database --project demo-jokenpo \"vitest run --config vitest.emulator.config.ts\""
   },
   "dependencies": {
+    "@noble/hashes": "^2.4.0",
     "firebase": "^13.2.0",
     "preact": "^11.2.0"
   },
