@@ -1,8 +1,16 @@
-// Ignore Visual Studio Code settings
-.vscode
+# Dependências e build
+node_modules/
+dist/
 
-// Ignore local Firebase config
-assets/js/localConfig.js
+# Configuração local (credenciais do Firebase)
+.env.local
+.env.*.local
 
-// Ignore old scripts file
-assets/js/script.js
+# Firebase
+.firebase/
+*-debug.log
+firebase-export-*/
+
+# Editor e sistema
+.vscode/
+.DS_Store

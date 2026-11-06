@@ -1,0 +1,83 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('players/player1/uid').val() === auth.uid) || (!newData.exists() && (data.child('players/player1/uid').val() === auth.uid || data.child('createdAt').val() < now - 86400000)))",
+        ".validate": "$code.matches(/^[A-HJKMNP-Z2-9]{4}$/) && newData.hasChildren(['createdAt', 'currentMatch'])",
+
+        "createdAt": {
+          ".validate": "newData.isNumber() && ((!data.exists() && newData.val() === now) || newData.val() === data.val())"
+        },
+
+        "players": {
+          "$slot": {
+            ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || data.child('uid').val() === auth.uid || (!newData.exists() && data.child('connected').val() === false && data.child('seenAt').val() < now - 60000))",
+            ".validate": "($slot === 'player1' || $slot === 'player2') && newData.hasChildren(['uid', 'connected', 'seenAt', 'joinedAt']) && newData.parent().parent().child('createdAt').exists() && !($slot === 'player1' && newData.parent().child('player2/uid').val() === auth.uid) && !($slot === 'player2' && newData.parent().child('player1/uid').val() === auth.uid)",
+            "uid": {
+              ".validate": "newData.val() === data.val() || (!data.exists() && newData.val() === auth.uid)"
+            },
+            "connected": {
+              ".validate": "newData.isBoolean()"
+            },
+            "seenAt": {
+              ".validate": "newData.isNumber() && newData.val() <= now"
+            },
+            "joinedAt": {
+              ".validate": "newData.isNumber() && ((!data.exists() && newData.val() === now) || newData.val() === data.val())"
+            },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "currentMatch": {
+          ".write": "auth != null && (root.child('rooms/' + $code + '/players/player1/uid').val() === auth.uid || root.child('rooms/' + $code + '/players/player2/uid').val() === auth.uid) && ((data.parent().child('resetRequest').exists() && data.parent().child('resetRequest/by').val() !== auth.uid) || !data.parent().child('players/player1').exists() || !data.parent().child('players/player2').exists())",
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{1,32}$/) && newData.val() !== data.val()"
+        },
+
+        "resetRequest": {
+          ".write": "auth != null && (root.child('rooms/' + $code + '/players/player1/uid').val() === auth.uid || root.child('rooms/' + $code + '/players/player2/uid').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['by', 'at'])",
+          "by": { ".validate": "newData.val() === auth.uid" },
+          "at": { ".validate": "newData.isNumber() && newData.val() === now" },
+          "$other": { ".validate": false }
+        },
+
+        "matches": {
+          "$matchId": {
+            ".validate": "$matchId.matches(/^[A-Za-z0-9_-]{1,32}$/)",
+            "rounds": {
+              "$round": {
+                ".validate": "$round.matches(/^[0-9]{1,4}$/)",
+                "$slot": {
+                  ".validate": "$slot === 'player1' || $slot === 'player2'",
+                  "commit": {
+                    ".write": "auth != null && !data.exists() && root.child('rooms/' + $code + '/players/' + $slot + '/uid').val() === auth.uid && root.child('rooms/' + $code + '/currentMatch').val() === $matchId",
+                    ".validate": "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)"
+                  },
+                  "reveal": {
+                    ".write": "auth != null && !data.exists() && root.child('rooms/' + $code + '/players/' + $slot + '/uid').val() === auth.uid && root.child('rooms/' + $code + '/currentMatch').val() === $matchId && data.parent().parent().child('player1/commit').exists() && data.parent().parent().child('player2/commit').exists()",
+                    ".validate": "newData.hasChildren(['move', 'nonce'])",
+                    "move": {
+                      ".validate": "newData.val() === 'rock' || newData.val() === 'paper' || newData.val() === 'scissors'"
+                    },
+                    "nonce": {
+                      ".validate": "newData.isString() && newData.val().matches(/^[0-9a-f]{32}$/)"
+                    },
+                    "$other": { ".validate": false }
+                  },
+                  "$other": { ".validate": false }
+                }
+              }
+            },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}
