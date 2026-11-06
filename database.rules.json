@@ -6,10 +6,14 @@
       "$code": {
         ".read": "auth != null",
         ".write": "auth != null && ((!data.exists() && newData.child('players/player1/uid').val() === auth.uid) || (!newData.exists() && ((data.child('players/player1/uid').val() === auth.uid && !data.child('players/player2').exists()) || (data.child('players/player2/uid').val() === auth.uid && !data.child('players/player1').exists()) || data.child('createdAt').val() < now - 86400000)))",
-        ".validate": "$code.matches(/^[A-HJKMNP-Z2-9]{4}$/) && newData.hasChildren(['createdAt', 'currentMatch'])",
+        ".validate": "$code.matches(/^[A-HJKMNP-Z2-9]{4}$/) && newData.hasChildren(['createdAt', 'currentMatch', 'bestOf'])",
 
         "createdAt": {
           ".validate": "newData.isNumber() && ((!data.exists() && newData.val() === now) || newData.val() === data.val())"
+        },
+
+        "bestOf": {
+          ".validate": "(newData.val() === 0 || newData.val() === 3 || newData.val() === 5 || newData.val() === 7) && (!data.exists() || newData.val() === data.val())"
         },
 
         "players": {
@@ -18,6 +22,9 @@
             ".validate": "($slot === 'player1' || $slot === 'player2') && newData.hasChildren(['uid', 'connected', 'seenAt', 'joinedAt']) && newData.parent().parent().child('createdAt').exists() && !($slot === 'player1' && newData.parent().child('player2/uid').val() === auth.uid) && !($slot === 'player2' && newData.parent().child('player1/uid').val() === auth.uid)",
             "uid": {
               ".validate": "newData.val() === data.val() || (!data.exists() && newData.val() === auth.uid)"
+            },
+            "name": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"
             },
             "connected": {
               ".validate": "newData.isBoolean()"

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { startComputerGame } from '../src/computerGame';
 import { App } from '../src/ui/App';
 import { FakeServer, createPlayer, settle, type TestPlayer } from './support/fakeServer';
 
@@ -21,7 +22,13 @@ afterEach(() => {
 });
 
 async function renderPlayer(player: TestPlayer, language: 'pt-BR' | 'en' = 'pt-BR') {
-  render(<App session={player.session} language={language} />);
+  render(
+    <App
+      session={player.session}
+      language={language}
+      startComputerGame={(bestOf) => startComputerGame(bestOf, null, { thinkingMs: [10, 20] })}
+    />,
+  );
   await player.session.start();
   await settle();
 }
@@ -119,5 +126,79 @@ describe('espera e jogo', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
     await settle();
     expect(screen.getByRole('button', { name: 'Criar sala' })).toBeTruthy();
+  });
+});
+
+describe('fase 5: formato, apelido e computador', () => {
+  it('o formato escolhido vale para a sala criada e aparece no placar', async () => {
+    const alice = createPlayer(server, 'alice');
+    await renderPlayer(alice);
+    fireEvent.click(screen.getByRole('radio', { name: 'Melhor de 3' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar sala' }));
+    await settle();
+    const code = screen.getByText(/^[A-HJKMNP-Z2-9]{4}$/).textContent ?? '';
+    const bob = createPlayer(server, 'bob');
+    await bob.session.start();
+    await bob.session.joinRoom(code);
+    await settle();
+    expect(screen.getByText('Melhor de 3 · vence quem fizer 2')).toBeTruthy();
+    expect(localStorage.getItem('jokenpo:best-of')).toBe('3');
+  });
+
+  it('o apelido digitado é salvo e aparece para o adversário', async () => {
+    const alice = createPlayer(server, 'alice');
+    await renderPlayer(alice);
+    const input = screen.getByLabelText('Seu apelido (opcional)');
+    fireEvent.input(input, { target: { value: 'Alice' } });
+    fireEvent.blur(input);
+    fireEvent.click(screen.getByRole('button', { name: 'Criar sala' }));
+    await settle();
+    const code = screen.getByText(/^[A-HJKMNP-Z2-9]{4}$/).textContent ?? '';
+    const bob = createPlayer(server, 'bob');
+    await bob.session.start();
+    await bob.session.joinRoom(code);
+    await settle();
+    expect(bob.view()).toMatchObject({ opponentName: 'Alice' });
+    expect(screen.getByText('Alice')).toBeTruthy();
+  });
+
+  it('jogar contra o computador abre o jogo direto e sair volta para o início', async () => {
+    await renderPlayer(createPlayer(server, 'alice'));
+    fireEvent.click(screen.getByRole('button', { name: 'Jogar contra o computador' }));
+    await waitFor(() => expect(screen.getByText('Contra o computador')).toBeTruthy());
+    expect(screen.getByText('Computador')).toBeTruthy();
+    expect(screen.queryByText('O adversário entrou. Boa partida!')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sair da sala' }));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Criar sala' })).toBeTruthy());
+  });
+
+  it('o adversário aparece como online', async () => {
+    await startRenderedGame();
+    expect(screen.getByText('online')).toBeTruthy();
+  });
+
+  it('fim de partida mostra o vencedor e o botão de revanche', async () => {
+    const alice = createPlayer(server, 'alice');
+    await renderPlayer(alice);
+    fireEvent.click(screen.getByRole('radio', { name: 'Melhor de 3' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar sala' }));
+    await settle();
+    const code = screen.getByText(/^[A-HJKMNP-Z2-9]{4}$/).textContent ?? '';
+    const bob = createPlayer(server, 'bob');
+    await bob.session.start();
+    await bob.session.joinRoom(code);
+    await settle();
+    for (let i = 0; i < 2; i += 1) {
+      await alice.session.play('rock');
+      await bob.session.play('scissors');
+      await settle();
+    }
+    expect(screen.getByText('🏆 Você venceu a partida!')).toBeTruthy();
+    expect(screen.getByText('Placar final: 2 × 0')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Revanche' })).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Sua jogada' })).toBeNull();
   });
 });

@@ -22,7 +22,7 @@ function useEndingText(round: LastRoundView): string | null {
  * Resultado da última rodada. Quando chega uma rodada nova, faz a contagem
  * "Jo… Ken… Pô!" antes de mostrar as jogadas (sem animação se o sistema pedir menos movimento).
  */
-export function RoundCard({ round }: { round: LastRoundView }) {
+export function RoundCard({ round, myLabel, opponentLabel }: { round: LastRoundView; myLabel: string; opponentLabel: string }) {
   const { t } = useI18n();
   const [step, setStep] = useState<number | null>(() => (prefersReducedMotion() ? null : 0));
   const endingText = useEndingText(round);
@@ -50,12 +50,12 @@ export function RoundCard({ round }: { round: LastRoundView }) {
       <div class="round-moves" aria-hidden="true">
         <span class="round-move">
           <span class="round-move-emoji">{counting ? '✊' : round.myMove ? MOVE_EMOJI[round.myMove] : '—'}</span>
-          <span class="round-move-owner">{t.game.you}</span>
+          <span class="round-move-owner">{myLabel}</span>
         </span>
         <span class="round-vs">{counting ? t.game.countdown[step] : 'vs'}</span>
         <span class="round-move">
           <span class="round-move-emoji">{counting ? '✊' : round.opponentMove ? MOVE_EMOJI[round.opponentMove] : '—'}</span>
-          <span class="round-move-owner">{t.game.opponent}</span>
+          <span class="round-move-owner">{opponentLabel}</span>
         </span>
       </div>
       {!counting && (

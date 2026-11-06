@@ -105,6 +105,6 @@ describe('jogo completo no emulador', () => {
     const carol = createPlayer('carol');
     await carol.session.start();
     await carol.session.joinRoom(code);
-    expect(carol.session.getView()).toEqual({ screen: 'home', busy: false, error: 'not-found' });
+    expect(carol.session.getView()).toEqual({ screen: 'home', busy: false, error: 'not-found', nickname: null });
   });
 });

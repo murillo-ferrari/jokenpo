@@ -4,7 +4,7 @@ import type { PlayingView } from '../../application/view';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { MOVE_EMOJI, MOVE_ORDER } from '../components/moves';
 import { RoundCard } from '../components/RoundCard';
-import { Scoreboard } from '../components/Scoreboard';
+import { Scoreboard, usePlayerNames } from '../components/Scoreboard';
 import { useI18n } from '../i18n';
 
 function useStatusText(view: PlayingView): string {
@@ -23,38 +23,28 @@ export function GameScreen({ view, session }: { view: PlayingView; session: Game
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const status = useStatusText(view);
   const previousRounds = view.history.slice(0, -1).reverse();
+  const names = usePlayerNames(view);
 
   return (
     <div class="screen game">
-      <p class="room-tag">{t.game.roomLabel(view.code)}</p>
+      <p class="room-tag">{view.vsComputer ? t.game.vsComputerLabel : t.game.roomLabel(view.code)}</p>
 
-      <Scoreboard me={view.scores.me} opponent={view.scores.opponent} ties={view.ties} roundNumber={view.roundNumber} />
+      <Scoreboard view={view} />
 
-      {view.lastRound && <RoundCard round={view.lastRound} />}
+      {view.lastRound && <RoundCard round={view.lastRound} myLabel={names.me} opponentLabel={names.opponent} />}
 
-      <p class={`status ${view.opponent === 'disconnected' ? 'status-warning' : ''}`} role="status">
-        {status}
-      </p>
+      {view.phase === 'finished' ? (
+        <MatchOver view={view} session={session} />
+      ) : (
+        <>
+          <p class={`status ${view.opponent === 'disconnected' ? 'status-warning' : ''}`} role="status">
+            {status}
+          </p>
+          <MoveButtons view={view} session={session} />
+        </>
+      )}
 
-      <div class="moves" role="group" aria-label={t.game.movesLabel}>
-        {MOVE_ORDER.map((move) => (
-          <button
-            key={move}
-            type="button"
-            class="move-button"
-            aria-pressed={view.myMove === move}
-            disabled={!view.canPlay}
-            onClick={() => session.play(move)}
-          >
-            <span class="move-emoji" aria-hidden="true">
-              {MOVE_EMOJI[move]}
-            </span>
-            <span class="move-label">{t.moves[move]}</span>
-          </button>
-        ))}
-      </div>
-
-      {view.reset === 'requested-by-me' && (
+      {view.phase !== 'finished' && view.reset === 'requested-by-me' && (
         <div class="reset-pending" role="status">
           <p>{t.reset.waitingAnswer}</p>
           <button type="button" class="button button-ghost" onClick={() => session.cancelReset()}>
@@ -89,21 +79,23 @@ export function GameScreen({ view, session }: { view: PlayingView; session: Game
       )}
 
       <div class="actions actions-footer">
-        <button
-          type="button"
-          class="button button-secondary"
-          disabled={view.reset !== 'none'}
-          onClick={() => session.requestReset()}
-        >
-          {t.reset.request}
-        </button>
+        {view.phase !== 'finished' && (
+          <button
+            type="button"
+            class="button button-secondary"
+            disabled={view.reset !== 'none'}
+            onClick={() => session.requestReset()}
+          >
+            {t.reset.request}
+          </button>
+        )}
         <button type="button" class="button button-ghost" onClick={() => setConfirmingLeave(true)}>
           {t.leave.button}
         </button>
       </div>
 
       <ConfirmDialog
-        open={view.reset === 'requested-by-opponent'}
+        open={view.reset === 'requested-by-opponent' && view.phase !== 'finished'}
         title={t.reset.incomingTitle}
         body={t.reset.incomingBody}
         confirmLabel={t.reset.accept}
@@ -126,5 +118,54 @@ export function GameScreen({ view, session }: { view: PlayingView; session: Game
         onCancel={() => setConfirmingLeave(false)}
       />
     </div>
+  );
+}
+
+function MoveButtons({ view, session }: { view: PlayingView; session: GameSession }) {
+  const { t } = useI18n();
+  return (
+    <div class="moves" role="group" aria-label={t.game.movesLabel}>
+      {MOVE_ORDER.map((move) => (
+        <button
+          key={move}
+          type="button"
+          class="move-button"
+          aria-pressed={view.myMove === move}
+          disabled={!view.canPlay}
+          onClick={() => session.play(move)}
+        >
+          <span class="move-emoji" aria-hidden="true">
+            {MOVE_EMOJI[move]}
+          </span>
+          <span class="move-label">{t.moves[move]}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Fim de partida no formato "melhor de N": vencedor, placar final e revanche. */
+function MatchOver({ view, session }: { view: PlayingView; session: GameSession }) {
+  const { t } = useI18n();
+  const won = view.matchResult === 'win';
+  const names = usePlayerNames(view);
+  return (
+    <section class={`match-over ${won ? 'result-win' : 'result-loss'}`} role="status">
+      <p class="match-over-title">{won ? t.game.matchWon : t.game.matchLost(names.opponent)}</p>
+      <p class="match-over-score">{t.game.finalScore(view.scores.me, view.scores.opponent)}</p>
+      {view.reset === 'requested-by-opponent' && <p class="match-over-offer">{t.game.rematchOffered}</p>}
+      {view.reset === 'requested-by-me' ? (
+        <>
+          <p>{t.game.rematchWaiting}</p>
+          <button type="button" class="button button-ghost" onClick={() => session.cancelReset()}>
+            {t.reset.cancel}
+          </button>
+        </>
+      ) : (
+        <button type="button" class="button button-primary button-large" onClick={() => session.rematch()}>
+          {t.game.rematch}
+        </button>
+      )}
+    </section>
   );
 }

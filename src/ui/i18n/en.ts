@@ -9,7 +9,16 @@ export const en: Messages = {
 
   moves: { rock: 'Rock', paper: 'Paper', scissors: 'Scissors' },
 
+  format: {
+    label: 'Match format',
+    options: { 0: 'Endless', 3: 'Best of 3', 5: 'Best of 5', 7: 'Best of 7' },
+    summary: (bestOf, wins) => `Best of ${bestOf} · first to ${wins}`,
+  },
+
   home: {
+    nicknameLabel: 'Your nickname (optional)',
+    nicknameHint: 'Shown to your opponent on the scoreboard.',
+    playComputer: 'Play against the computer',
     create: 'Create room',
     or: 'or',
     joinLabel: 'Room code',
@@ -38,6 +47,17 @@ export const en: Messages = {
 
   game: {
     roomLabel: (code) => `Room ${code}`,
+    vsComputerLabel: 'Against the computer',
+    computer: 'Computer',
+    online: 'online',
+    offline: 'offline',
+    matchWon: '🏆 You won the match!',
+    matchLost: (name) => `${name} won the match.`,
+    finalScore: (me, opponent) => `Final score: ${me} × ${opponent}`,
+    matchOver: 'Match over',
+    rematch: 'Rematch',
+    rematchWaiting: 'Rematch requested. Waiting for your opponent…',
+    rematchOffered: 'Your opponent wants a rematch!',
     round: (n) => `Round ${n}`,
     you: 'You',
     opponent: 'Opponent',

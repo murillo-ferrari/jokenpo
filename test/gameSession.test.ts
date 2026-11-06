@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayingView } from '../src/application/view';
 import { DEFAULT_REVEAL_TIMEOUT_MS } from '../src/domain/match';
 import { STALE_PLAYER_MS } from '../src/domain/room';
-import type { RoomCode } from '../src/domain/types';
+import type { BestOf, Move, RoomCode } from '../src/domain/types';
+import { GameSession } from '../src/application/gameSession';
 import { FakeServer, createPlayer, nodeRandom, settle, type TestPlayer } from './support/fakeServer';
 
 let server: FakeServer;
@@ -28,11 +29,11 @@ function codeOf(player: TestPlayer): RoomCode {
 }
 
 /** Alice cria a sala e Bob entra pelo código. */
-async function startGame() {
+async function startGame(bestOf: BestOf = 0) {
   const alice = createPlayer(server, 'alice');
   const bob = createPlayer(server, 'bob');
   await alice.session.start();
-  await alice.session.createRoom();
+  await alice.session.createRoom(bestOf);
   await settle();
   await bob.session.start();
   await bob.session.joinRoom(codeOf(alice).toLowerCase());
@@ -44,7 +45,7 @@ describe('entrar na sala', () => {
   it('quem cria a sala espera o adversário com o código à mostra', async () => {
     const alice = createPlayer(server, 'alice');
     await alice.session.start();
-    expect(alice.view()).toEqual({ screen: 'home', busy: false, error: null });
+    expect(alice.view()).toEqual({ screen: 'home', busy: false, error: null, nickname: null });
 
     await alice.session.createRoom();
     await settle();
@@ -84,14 +85,14 @@ describe('entrar na sala', () => {
     const alice = createPlayer(server, 'alice');
     await alice.session.start();
     await alice.session.joinRoom(input);
-    expect(alice.view()).toEqual({ screen: 'home', busy: false, error });
+    expect(alice.view()).toEqual({ screen: 'home', busy: false, error, nickname: null });
   });
 
   it('sala inexistente', async () => {
     const alice = createPlayer(server, 'alice');
     await alice.session.start();
     await alice.session.joinRoom('ZZZZ');
-    expect(alice.view()).toEqual({ screen: 'home', busy: false, error: 'not-found' });
+    expect(alice.view()).toEqual({ screen: 'home', busy: false, error: 'not-found', nickname: null });
   });
 
   it('sala cheia', async () => {
@@ -99,7 +100,7 @@ describe('entrar na sala', () => {
     const carol = createPlayer(server, 'carol');
     await carol.session.start();
     await carol.session.joinRoom(code);
-    expect(carol.view()).toEqual({ screen: 'home', busy: false, error: 'full' });
+    expect(carol.view()).toEqual({ screen: 'home', busy: false, error: 'full', nickname: null });
   });
 
   it('link de convite entra direto na sala', async () => {
@@ -194,7 +195,7 @@ describe('recarregar a página (F5)', () => {
     const alice = createPlayer(server, 'alice');
     alice.store.room = 'ZZZZ' as RoomCode;
     await alice.session.start();
-    expect(alice.view()).toEqual({ screen: 'home', busy: false, error: null });
+    expect(alice.view()).toEqual({ screen: 'home', busy: false, error: null, nickname: null });
     expect(alice.store.room).toBeNull();
   });
 });
@@ -239,7 +240,7 @@ describe('W.O. e desconexão', () => {
     server.time += STALE_PLAYER_MS + 1;
     vi.advanceTimersByTime(STALE_PLAYER_MS + 100);
     await settle();
-    expect(alice.view()).toEqual({ screen: 'waiting', code });
+    expect(alice.view()).toEqual({ screen: 'waiting', code, bestOf: 0 });
     expect(alice.notices).toContain('opponent-left');
   });
 
@@ -309,9 +310,9 @@ describe('sair da sala', () => {
 
     await bob.session.leave();
     await settle();
-    expect(bob.view()).toEqual({ screen: 'home', busy: false, error: null });
+    expect(bob.view()).toEqual({ screen: 'home', busy: false, error: null, nickname: null });
     expect(bob.store.room).toBeNull();
-    expect(alice.view()).toEqual({ screen: 'waiting', code });
+    expect(alice.view()).toEqual({ screen: 'waiting', code, bestOf: 0 });
     expect(alice.notices).toContain('opponent-left');
 
     const carol = createPlayer(server, 'carol');
@@ -325,7 +326,7 @@ describe('sair da sala', () => {
     const { alice, bob, code } = await startGame();
     await alice.session.leave();
     await settle();
-    expect(bob.view()).toEqual({ screen: 'waiting', code });
+    expect(bob.view()).toEqual({ screen: 'waiting', code, bestOf: 0 });
   });
 
   it('o último a sair apaga a sala', async () => {
@@ -344,7 +345,122 @@ describe('sair da sala', () => {
     await settle();
     server.mutate(codeOf(alice), () => null);
     await settle();
-    expect(alice.view()).toEqual({ screen: 'home', busy: false, error: null });
+    expect(alice.view()).toEqual({ screen: 'home', busy: false, error: null, nickname: null });
     expect(alice.notices).toEqual(['room-closed']);
+  });
+});
+
+describe('melhor de N e revanche', () => {
+  async function round(alice: TestPlayer, bob: TestPlayer, a: Move, b: Move) {
+    await alice.session.play(a);
+    await bob.session.play(b);
+    await settle();
+  }
+
+  it('a partida termina quando alguém faz as vitórias necessárias', async () => {
+    const { alice, bob } = await startGame(3);
+    expect(playing(alice)).toMatchObject({ bestOf: 3, winsNeeded: 2, phase: 'choosing' });
+
+    await round(alice, bob, 'rock', 'scissors');
+    await round(alice, bob, 'rock', 'rock'); // empate não conta
+    expect(playing(alice).phase).toBe('choosing');
+    await round(alice, bob, 'paper', 'rock');
+
+    expect(playing(alice)).toMatchObject({ phase: 'finished', matchResult: 'win', canPlay: false, scores: { me: 2, opponent: 0 } });
+    expect(playing(bob)).toMatchObject({ phase: 'finished', matchResult: 'loss', canPlay: false });
+  });
+
+  it('com a partida decidida, não dá para jogar mais', async () => {
+    const { alice, bob, code } = await startGame(3);
+    await round(alice, bob, 'rock', 'scissors');
+    await round(alice, bob, 'rock', 'scissors');
+    await alice.session.play('rock');
+    await settle();
+    expect(server.snapshot(code)?.rounds).toHaveLength(2);
+  });
+
+  it('revanche: um pede, o outro aceita clicando também, e começa outra partida no mesmo formato', async () => {
+    const { alice, bob } = await startGame(3);
+    await round(alice, bob, 'rock', 'scissors');
+    await round(alice, bob, 'rock', 'scissors');
+
+    await bob.session.rematch();
+    await settle();
+    expect(playing(bob).reset).toBe('requested-by-me');
+    expect(playing(alice).reset).toBe('requested-by-opponent');
+
+    await alice.session.rematch();
+    await settle();
+    expect(playing(alice)).toMatchObject({ phase: 'choosing', bestOf: 3, roundNumber: 1, scores: { me: 0, opponent: 0 } });
+    expect(playing(bob)).toMatchObject({ phase: 'choosing', canPlay: true });
+  });
+
+  it('a sala de espera mostra o formato', async () => {
+    const alice = createPlayer(server, 'alice');
+    await alice.session.start();
+    await alice.session.createRoom(5);
+    await settle();
+    expect(alice.view()).toMatchObject({ screen: 'waiting', bestOf: 5 });
+  });
+});
+
+describe('apelidos', () => {
+  it('o apelido salvo vai junto ao criar e entrar na sala', async () => {
+    const alice = createPlayer(server, 'alice');
+    const bob = createPlayer(server, 'bob');
+    alice.store.saveNickname('Alice');
+    bob.store.saveNickname('Bob');
+    await alice.session.start();
+    expect(alice.view()).toMatchObject({ screen: 'home', nickname: 'Alice' });
+    await alice.session.createRoom();
+    await settle();
+    await bob.session.start();
+    await bob.session.joinRoom(codeOf(alice));
+    await settle();
+    expect(playing(alice)).toMatchObject({ myName: 'Alice', opponentName: 'Bob' });
+    expect(playing(bob)).toMatchObject({ myName: 'Bob', opponentName: 'Alice' });
+  });
+
+  it('trocar o apelido no meio do jogo atualiza a tela do adversário', async () => {
+    const { alice, bob } = await startGame();
+    expect(playing(alice).opponentName).toBeNull();
+    await bob.session.setNickname('  Bobby   Tables ');
+    await settle();
+    expect(playing(alice).opponentName).toBe('Bobby Tables');
+    expect(bob.store.nickname).toBe('Bobby Tables');
+  });
+
+  it('apagar o apelido volta ao nome genérico', async () => {
+    const { alice, bob } = await startGame();
+    await bob.session.setNickname('Bob');
+    await bob.session.setNickname('   ');
+    await settle();
+    expect(playing(alice).opponentName).toBeNull();
+  });
+});
+
+describe('sem conexão na abertura', () => {
+  it('mostra a tela inicial com aviso e tenta o login de novo ao criar a sala', async () => {
+    let attempts = 0;
+    const alice = createPlayer(server, 'alice');
+    const session = new GameSession({
+      identity: {
+        ensurePlayer: async () => {
+          attempts += 1;
+          if (attempts === 1) throw new Error('offline');
+          return alice.id;
+        },
+      },
+      gateway: alice.gateway,
+      clock: server.clock,
+      random: nodeRandom,
+      store: alice.store,
+    });
+    await session.start();
+    expect(session.getView()).toEqual({ screen: 'home', busy: false, error: 'unexpected', nickname: null });
+
+    await session.createRoom();
+    await settle();
+    expect(session.getView().screen).toBe('waiting');
   });
 });

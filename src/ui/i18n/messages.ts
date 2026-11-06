@@ -11,7 +11,17 @@ export interface Messages {
 
   moves: Record<Move, string>;
 
+  format: {
+    label: string;
+    options: Record<0 | 3 | 5 | 7, string>;
+    /** Linha do placar, ex.: "Melhor de 5 · vence quem fizer 3". */
+    summary: (bestOf: number, wins: number) => string;
+  };
+
   home: {
+    nicknameLabel: string;
+    nicknameHint: string;
+    playComputer: string;
     create: string;
     or: string;
     joinLabel: string;
@@ -33,6 +43,17 @@ export interface Messages {
 
   game: {
     roomLabel: (code: string) => string;
+    vsComputerLabel: string;
+    computer: string;
+    online: string;
+    offline: string;
+    matchWon: string;
+    matchLost: (opponent: string) => string;
+    matchOver: string;
+    finalScore: (me: number, opponent: number) => string;
+    rematch: string;
+    rematchWaiting: string;
+    rematchOffered: string;
     round: (n: number) => string;
     you: string;
     opponent: string;

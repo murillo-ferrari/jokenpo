@@ -125,6 +125,7 @@ describe('summarize', () => {
       scores: { player1: 0, player2: 0 },
       ties: 0,
       history: [],
+      winner: null,
       current: { index: 0, phase: 'choosing', committed: { player1: false, player2: false } },
     });
   });
@@ -156,6 +157,48 @@ describe('summarize', () => {
     const summary = summarize(rounds, at(T0 + TIMEOUT + 1));
     expect(summary.scores).toEqual({ player1: 1, player2: 0 });
     expect(summary.current.index).toBe(1);
+  });
+});
+
+describe('summarize: melhor de N', () => {
+  const p1Wins = () => played('rock', 'scissors');
+  const p2Wins = () => played('rock', 'paper');
+  const tie = () => played('rock', 'rock');
+
+  it('melhor de 3: quem faz 2 vitórias leva a partida', () => {
+    const summary = summarize([p1Wins(), p2Wins(), p1Wins()], { now: T0, bestOf: 3 });
+    expect(summary.winner).toBe('player1');
+    expect(summary.scores).toEqual({ player1: 2, player2: 1 });
+  });
+
+  it('empates não contam para o melhor de N', () => {
+    const summary = summarize([tie(), tie(), p2Wins(), tie(), p2Wins()], { now: T0, bestOf: 3 });
+    expect(summary.winner).toBe('player2');
+    expect(summary.ties).toBe(3);
+  });
+
+  it('sem vitórias suficientes, a partida segue', () => {
+    const summary = summarize([p1Wins(), p2Wins()], { now: T0, bestOf: 5 });
+    expect(summary.winner).toBeNull();
+    expect(summary.current.index).toBe(2);
+  });
+
+  it('rodadas gravadas depois da decisão são ignoradas', () => {
+    const summary = summarize([p1Wins(), p1Wins(), p2Wins(), p2Wins()], { now: T0, bestOf: 3 });
+    expect(summary.winner).toBe('player1');
+    expect(summary.history).toHaveLength(2);
+    expect(summary.scores).toEqual({ player1: 2, player2: 0 });
+  });
+
+  it('partida livre (0) nunca tem vencedor', () => {
+    const summary = summarize(Array.from({ length: 10 }, p1Wins), { now: T0, bestOf: 0 });
+    expect(summary.winner).toBeNull();
+    expect(summary.scores.player1).toBe(10);
+  });
+
+  it('melhor de 7 precisa de 4 vitórias', () => {
+    expect(summarize(Array.from({ length: 3 }, p1Wins), { now: T0, bestOf: 7 }).winner).toBeNull();
+    expect(summarize(Array.from({ length: 4 }, p1Wins), { now: T0, bestOf: 7 }).winner).toBe('player1');
   });
 });
 

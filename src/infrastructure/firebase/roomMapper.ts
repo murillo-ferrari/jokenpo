@@ -1,6 +1,7 @@
 import type { PlayerPresence, ResetRequest, Room } from '../../domain/room';
 import {
   SLOTS,
+  isBestOf,
   isMove,
   toPlayerId,
   type MatchId,
@@ -40,6 +41,8 @@ export function toRoom(code: RoomCode, value: unknown): Room | null {
   return {
     code,
     createdAt,
+    // Salas sem formato (ou com valor desconhecido) são partida livre.
+    bestOf: isBestOf(value.bestOf) ? value.bestOf : 0,
     players,
     currentMatch: currentMatch as MatchId,
     rounds: toRounds(match.rounds),
@@ -53,7 +56,7 @@ function toPresence(value: unknown): PlayerPresence | null {
   const seenAt = asNumber(value.seenAt);
   const joinedAt = asNumber(value.joinedAt);
   if (uid === null || seenAt === null || joinedAt === null || typeof value.connected !== 'boolean') return null;
-  return { id: toPlayerId(uid), connected: value.connected, seenAt, joinedAt };
+  return { id: toPlayerId(uid), name: asString(value.name), connected: value.connected, seenAt, joinedAt };
 }
 
 function toResetRequest(value: unknown): ResetRequest | null {

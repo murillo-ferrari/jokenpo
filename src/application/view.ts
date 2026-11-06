@@ -1,6 +1,6 @@
 import type { MatchSummary, RoundEnding } from '../domain/match';
 import { opponentStatus, type Room } from '../domain/room';
-import { opponentOf, type Move, type PlayerId, type PlayerSlot, type RoomCode } from '../domain/types';
+import { opponentOf, winsNeeded, type BestOf, type Move, type PlayerId, type PlayerSlot, type RoomCode } from '../domain/types';
 import type { JoinError } from './joinRoom';
 
 /*
@@ -26,11 +26,21 @@ export interface LastRoundView {
 export interface PlayingView {
   screen: 'playing';
   code: RoomCode;
+  /** Partida contra o computador (sem rede). */
+  vsComputer: boolean;
+  bestOf: BestOf;
+  /** Vitórias para levar a partida; `null` na partida livre. */
+  winsNeeded: number | null;
+  myName: string | null;
+  opponentName: string | null;
   /** Número da rodada em andamento, começando em 1. */
   roundNumber: number;
   scores: { me: number; opponent: number };
   ties: number;
-  phase: 'choosing' | 'revealing';
+  /** `finished`: alguém já levou a partida (formato "melhor de N"); só resta a revanche. */
+  phase: 'choosing' | 'revealing' | 'finished';
+  /** Resultado da partida, quando encerrada. */
+  matchResult: Exclude<RoundResult, 'tie'> | null;
   /** A jogada que escolhi nesta rodada (se escolhi neste navegador). */
   myMove: Move | null;
   iHaveChosen: boolean;
@@ -44,11 +54,21 @@ export interface PlayingView {
   reset: ResetState;
 }
 
-export type GameView =
-  | { screen: 'loading' }
-  | { screen: 'home'; busy: boolean; error: HomeError | null }
-  | { screen: 'waiting'; code: RoomCode }
-  | PlayingView;
+export interface HomeView {
+  screen: 'home';
+  busy: boolean;
+  error: HomeError | null;
+  /** Apelido salvo neste navegador. */
+  nickname: string | null;
+}
+
+export interface WaitingView {
+  screen: 'waiting';
+  code: RoomCode;
+  bestOf: BestOf;
+}
+
+export type GameView = { screen: 'loading' } | HomeView | WaitingView | PlayingView;
 
 /** Avisos pontuais (toasts). A UI traduz cada um para o idioma escolhido. */
 export type Notice =
@@ -85,13 +105,15 @@ export interface PlayingViewInput {
   now: number;
   /** Uma ação minha está em andamento (bloqueia novos cliques). */
   busy: boolean;
+  vsComputer: boolean;
 }
 
-export function buildPlayingView({ room, mySlot, me, summary, myPendingMove, now, busy }: PlayingViewInput): PlayingView {
+export function buildPlayingView({ room, mySlot, me, summary, myPendingMove, now, busy, vsComputer }: PlayingViewInput): PlayingView {
   const opponent = opponentOf(mySlot);
-  const { current } = summary;
-  const iHaveChosen = current.phase === 'revealing' || current.committed[mySlot];
-  const opponentHasChosen = current.phase === 'revealing' || current.committed[opponent];
+  const { current, winner } = summary;
+  const finished = winner !== null;
+  const iHaveChosen = !finished && (current.phase === 'revealing' || current.committed[mySlot]);
+  const opponentHasChosen = !finished && (current.phase === 'revealing' || current.committed[opponent]);
   const status = opponentStatus(room, mySlot, now);
   const history = summary.history.map((round) => toRoundView(round, mySlot));
 
@@ -101,16 +123,22 @@ export function buildPlayingView({ room, mySlot, me, summary, myPendingMove, now
   return {
     screen: 'playing',
     code: room.code,
+    vsComputer,
+    bestOf: room.bestOf,
+    winsNeeded: winsNeeded(room.bestOf),
+    myName: room.players[mySlot]?.name ?? null,
+    opponentName: room.players[opponent]?.name ?? null,
     roundNumber: current.index + 1,
     scores: { me: summary.scores[mySlot], opponent: summary.scores[opponent] },
     ties: summary.ties,
-    phase: current.phase,
-    myMove: myPendingMove,
+    phase: finished ? 'finished' : current.phase,
+    matchResult: finished ? (winner === mySlot ? 'win' : 'loss') : null,
+    myMove: finished ? null : myPendingMove,
     iHaveChosen,
     opponentHasChosen,
-    canPlay: current.phase === 'choosing' && !iHaveChosen && !busy && status === 'connected',
+    canPlay: !finished && current.phase === 'choosing' && !iHaveChosen && !busy && status === 'connected',
     opponent: status === 'connected' ? 'connected' : 'disconnected',
-    revealDeadline: current.phase === 'revealing' ? current.deadline : null,
+    revealDeadline: !finished && current.phase === 'revealing' ? current.deadline : null,
     lastRound: history.at(-1) ?? null,
     history,
     reset,

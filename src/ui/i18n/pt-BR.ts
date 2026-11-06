@@ -9,7 +9,16 @@ export const ptBR: Messages = {
 
   moves: { rock: 'Pedra', paper: 'Papel', scissors: 'Tesoura' },
 
+  format: {
+    label: 'Formato da partida',
+    options: { 0: 'Livre', 3: 'Melhor de 3', 5: 'Melhor de 5', 7: 'Melhor de 7' },
+    summary: (bestOf, wins) => `Melhor de ${bestOf} · vence quem fizer ${wins}`,
+  },
+
   home: {
+    nicknameLabel: 'Seu apelido (opcional)',
+    nicknameHint: 'Aparece para o adversário no placar.',
+    playComputer: 'Jogar contra o computador',
     create: 'Criar sala',
     or: 'ou',
     joinLabel: 'Código da sala',
@@ -38,6 +47,17 @@ export const ptBR: Messages = {
 
   game: {
     roomLabel: (code) => `Sala ${code}`,
+    vsComputerLabel: 'Contra o computador',
+    computer: 'Computador',
+    online: 'online',
+    offline: 'desconectado',
+    matchWon: '🏆 Você venceu a partida!',
+    matchLost: (name) => `${name} venceu a partida.`,
+    finalScore: (me, opponent) => `Placar final: ${me} × ${opponent}`,
+    matchOver: 'Fim de partida',
+    rematch: 'Revanche',
+    rematchWaiting: 'Pedido de revanche enviado. Esperando o adversário…',
+    rematchOffered: 'O adversário quer revanche!',
     round: (n) => `Rodada ${n}`,
     you: 'Você',
     opponent: 'Adversário',

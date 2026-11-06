@@ -287,14 +287,50 @@ A antiga Fase 0, uma correção emergencial no código atual, foi descartada: a 
   - 36 de contraste;
   - verificação manual no Chrome com os emuladores e dois jogadores: convite, rodada, reset e avisos, sem erros no console.
 
-### Fase 5: funcionalidades novas (opcional, escolher)
+### Fase 5: funcionalidades novas ✅ concluída em 06/11/2026 (aguardando commit)
 
-- [ ] **Melhor de 3/5/7**, com tela de vencedor e "revanche".
-- [x] **Histórico das rodadas** da partida (feito na Fase 4).
-- [ ] **Apelidos** dos jogadores.
-- [ ] **Modo contra o computador**, sem Firebase, reaproveitando o domínio. Também serve para testar a interface sem banco.
-- [ ] **Indicador "oponente está online/digitando"**, aproveitando a presença.
-- [ ] **PWA** (instalável e com ícone).
+- [x] **Melhor de 3/5/7, ou livre**:
+  - escolhido ao criar a sala e lembrado no navegador; vale para todas as partidas da sala;
+  - empates não contam;
+  - ao fim da partida, um painel mostra o vencedor e o placar final, e os botões de jogada somem;
+  - **revanche**: um pede, e o outro aceita clicando também. Reaproveita o fluxo de reset, então as regras do banco não mudaram para isso;
+  - `bestOf` fica na sala, validado e imutável pelas regras;
+  - `summarize` ignora rodadas gravadas depois da decisão.
+- [x] **Histórico das rodadas** (feito na Fase 4).
+- [x] **Apelidos**:
+  - opcionais, guardados no navegador e enviados ao criar ou entrar na sala;
+  - podem ser trocados no meio do jogo;
+  - normalizados no domínio (`nickname.ts`): sem caracteres de controle, até 20 caracteres, sem cortar emojis;
+  - as regras aceitam até 40 unidades UTF-16 (um emoji ocupa 2);
+  - cada jogador só altera o próprio apelido;
+  - o nome aparece no placar, no cartão da rodada e na mensagem de fim de partida.
+- [x] **Modo contra o computador**:
+  - roda sem Firebase e sem rede;
+  - o servidor em memória dos testes virou código de produção (`infrastructure/local/memoryRooms.ts`), e os testes passaram a usá-lo;
+  - o `ComputerOpponent` joga pelo mesmo protocolo de commit-reveal de um jogador remoto, com aleatoriedade criptográfica, e aceita revanche;
+  - o `GameSession` não precisou de nenhum caso especial; só a tela sabe que é o computador (`vsComputer`);
+  - é montado em `src/computerGame.ts`, ao lado do `main.tsx`.
+- [x] **Indicador de presença**: "online" ou "desconectado" sob o nome do adversário. O "digitando" não se aplica a um jogo de clique; o equivalente é "o adversário já escolheu", que existe desde a Fase 4.
+- [x] **PWA**:
+  - manifesto com ícones de 192 e 512 px, "maskable" e SVG, mais o `apple-touch-icon`;
+  - `theme-color`;
+  - service worker que guarda a página e os arquivos do build já na instalação, então o modo contra o computador funciona offline desde a primeira visita;
+  - registrado só no build de produção.
+- [x] **Robustez**: se o login anônimo falhar na abertura (por exemplo, sem internet), a tela inicial continua usável com um aviso, e criar ou entrar tenta de novo.
+- [x] **Testes**: 160 unitários (+28) e 42 no emulador (+7):
+  - melhor de N;
+  - apelidos;
+  - revanche;
+  - computador jogando uma melhor de 3 inteira e aceitando a revanche;
+  - abertura sem internet;
+  - telas novas.
+
+  Os testes de interface pegaram dois bugs reais no campo de apelido: digitar e clicar logo em seguida perdia o texto.
+- [x] **Verificação manual no Chrome**, com o build de produção:
+  - partida melhor de 3 contra o computador com apelido, até o fim, e revanche;
+  - service worker ativo, com os arquivos do build no cache já na primeira visita.
+
+  A reabertura totalmente offline não foi vista na tela, porque a extensão do navegador desconectou nesse momento.
 
 ### Fase 6: documentação
 

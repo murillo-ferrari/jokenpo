@@ -18,6 +18,7 @@ export async function joinRoom(
   deps: { gateway: RoomGateway; clock: Clock },
   input: string,
   player: PlayerId,
+  name: string | null = null,
 ): Promise<JoinResult> {
   const parsed = parseRoomCode(input);
   if (!parsed.ok) return parsed;
@@ -34,7 +35,7 @@ export async function joinRoom(
     if (!available) return { ok: false, error: 'full' };
 
     if (available.mustRelease) await deps.gateway.releaseSlot(code, available.slot);
-    if (await deps.gateway.claimSlot(code, available.slot, player)) return { ok: true, code, slot: available.slot };
+    if (await deps.gateway.claimSlot(code, available.slot, player, name)) return { ok: true, code, slot: available.slot };
   }
   return { ok: false, error: 'full' };
 }

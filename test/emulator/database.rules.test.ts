@@ -27,6 +27,7 @@ const newPlayer = (uid: string) => ({ uid, connected: true, seenAt: TIMESTAMP, j
 
 const newRoom = (uid: string) => ({
   createdAt: TIMESTAMP,
+  bestOf: 0,
   currentMatch: MATCH,
   players: { player1: newPlayer(uid) },
 });
@@ -44,6 +45,7 @@ async function seedFullRoom(extra: Record<string, unknown> = {}) {
   const player = (uid: string) => ({ uid, connected: true, seenAt: now, joinedAt: now });
   await seed(ROOM, {
     createdAt: now,
+    bestOf: 0,
     currentMatch: MATCH,
     players: { player1: player('alice'), player2: player('bob') },
     ...extra,
@@ -122,6 +124,7 @@ describe('criar e apagar sala', () => {
     const now = Date.now();
     await seed(ROOM, {
       createdAt: now,
+      bestOf: 0,
       currentMatch: MATCH,
       players: { player2: { uid: 'bob', connected: true, seenAt: now, joinedAt: now } },
     });
@@ -129,8 +132,51 @@ describe('criar e apagar sala', () => {
   });
 
   it('qualquer um apaga sala com mais de 24 h', async () => {
-    await seed(ROOM, { createdAt: Date.now() - 25 * 3600_000, currentMatch: MATCH });
+    await seed(ROOM, { createdAt: Date.now() - 25 * 3600_000, bestOf: 0, currentMatch: MATCH });
     await assertSucceeds(db('carol').ref(ROOM).remove());
+  });
+});
+
+describe('formato da partida (bestOf)', () => {
+  it('aceita 0, 3, 5 e 7 na criação', async () => {
+    for (const [i, bestOf] of [0, 3, 5, 7].entries()) {
+      await assertSucceeds(db('alice').ref(`rooms/AB2${i + 3}`).set({ ...newRoom('alice'), bestOf }));
+    }
+  });
+
+  it('recusa outros valores e sala sem formato', async () => {
+    await assertFails(db('alice').ref(ROOM).set({ ...newRoom('alice'), bestOf: 4 }));
+    const { bestOf: _, ...withoutBestOf } = newRoom('alice');
+    await assertFails(db('alice').ref(ROOM).set(withoutBestOf));
+  });
+
+  it('não muda depois de criada', async () => {
+    await seedFullRoom();
+    await assertFails(db('alice').ref(`${ROOM}/bestOf`).set(5));
+  });
+});
+
+describe('apelidos', () => {
+  it('cada um define e remove o próprio apelido', async () => {
+    await seedFullRoom();
+    await assertSucceeds(db('bob').ref(`${ROOM}/players/player2/name`).set('Bob 🎮'));
+    await assertSucceeds(db('bob').ref(`${ROOM}/players/player2/name`).remove());
+  });
+
+  it('ninguém muda o apelido do outro', async () => {
+    await seedFullRoom();
+    await assertFails(db('alice').ref(`${ROOM}/players/player2/name`).set('Perdedor'));
+  });
+
+  it('recusa apelido vazio ou longo demais', async () => {
+    await seedFullRoom();
+    await assertFails(db('bob').ref(`${ROOM}/players/player2/name`).set(''));
+    await assertFails(db('bob').ref(`${ROOM}/players/player2/name`).set('x'.repeat(41)));
+  });
+
+  it('20 emojis (o máximo do domínio) cabem na regra', async () => {
+    await seedFullRoom();
+    await assertSucceeds(db('bob').ref(`${ROOM}/players/player2/name`).set('😀'.repeat(20)));
   });
 });
 
@@ -259,6 +305,7 @@ function newRoomSeed(uid: string) {
   const now = Date.now();
   return {
     createdAt: now,
+    bestOf: 0,
     currentMatch: MATCH,
     players: { player1: { uid, connected: true, seenAt: now, joinedAt: now } },
   };

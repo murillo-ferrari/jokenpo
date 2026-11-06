@@ -25,6 +25,22 @@ export function opponentOf(slot: PlayerSlot): PlayerSlot {
   return slot === 'player1' ? 'player2' : 'player1';
 }
 
+/**
+ * Formato da partida: "melhor de N" (vence quem ganhar a maioria de N rodadas; empates não contam)
+ * ou 0, partida livre, sem fim.
+ */
+export const BEST_OF_OPTIONS = [0, 3, 5, 7] as const;
+export type BestOf = (typeof BEST_OF_OPTIONS)[number];
+
+export function isBestOf(value: unknown): value is BestOf {
+  return (BEST_OF_OPTIONS as readonly unknown[]).includes(value);
+}
+
+/** Vitórias necessárias para levar a partida; `null` na partida livre. */
+export function winsNeeded(bestOf: BestOf): number | null {
+  return bestOf === 0 ? null : Math.ceil(bestOf / 2);
+}
+
 /** Resultado de uma rodada do ponto de vista neutro: quem venceu, ou empate. */
 export type RoundOutcome = PlayerSlot | 'tie';
 

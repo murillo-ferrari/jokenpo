@@ -1,30 +1,50 @@
+import type { PlayingView } from '../../application/view';
 import { useI18n } from '../i18n';
 
-interface ScoreboardProps {
-  me: number;
-  opponent: number;
-  ties: number;
-  roundNumber: number;
+/** Nomes exibidos: apelido, "Computador" ou o genérico "Você"/"Adversário". */
+export function usePlayerNames(view: PlayingView): { me: string; opponent: string } {
+  const { t } = useI18n();
+  return {
+    me: view.myName ?? t.game.you,
+    opponent: view.vsComputer ? t.game.computer : (view.opponentName ?? t.game.opponent),
+  };
 }
 
-export function Scoreboard({ me, opponent, ties, roundNumber }: ScoreboardProps) {
+/** Placar com nomes, indicador de presença do adversário e o formato da partida. */
+export function Scoreboard({ view }: { view: PlayingView }) {
   const { t } = useI18n();
+  const { me: myName, opponent: opponentName } = usePlayerNames(view);
+  const online = view.opponent === 'connected';
+
   return (
-    <section class="scoreboard" aria-label={t.game.scoreSummary(me, opponent, ties)}>
-      <div class="score score-me" aria-hidden="true">
-        <span class="score-label">{t.game.you}</span>
-        <span class="score-value">{me}</span>
+    <section class="scoreboard-wrapper" aria-label={t.game.scoreSummary(view.scores.me, view.scores.opponent, view.ties)}>
+      <div class="scoreboard" aria-hidden="true">
+        <div class="score score-me">
+          <span class="score-label" title={myName}>
+            {myName}
+          </span>
+          <span class="score-value">{view.scores.me}</span>
+        </div>
+        <div class="score-middle">
+          <span class="round-label">{view.phase === 'finished' ? t.game.matchOver : t.game.round(view.roundNumber)}</span>
+          <span class="ties-label">
+            {t.game.ties}: {view.ties}
+          </span>
+        </div>
+        <div class="score score-opponent">
+          <span class="score-label" title={opponentName}>
+            {opponentName}
+          </span>
+          <span class="score-value">{view.scores.opponent}</span>
+          {!view.vsComputer && (
+            <span class={`presence ${online ? 'presence-online' : 'presence-offline'}`}>
+              <span class="presence-dot" />
+              {online ? t.game.online : t.game.offline}
+            </span>
+          )}
+        </div>
       </div>
-      <div class="score-middle" aria-hidden="true">
-        <span class="round-label">{t.game.round(roundNumber)}</span>
-        <span class="ties-label">
-          {t.game.ties}: {ties}
-        </span>
-      </div>
-      <div class="score score-opponent" aria-hidden="true">
-        <span class="score-label">{t.game.opponent}</span>
-        <span class="score-value">{opponent}</span>
-      </div>
+      {view.winsNeeded !== null && <p class="format-line">{t.format.summary(view.bestOf, view.winsNeeded)}</p>}
     </section>
   );
 }

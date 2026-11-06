@@ -1,5 +1,5 @@
 import type { Room } from '../domain/room';
-import type { MatchId, Move, PlayerId, PlayerSlot, RoomCode } from '../domain/types';
+import type { BestOf, MatchId, Move, PlayerId, PlayerSlot, RoomCode } from '../domain/types';
 
 /**
  * Portas: o que os casos de uso precisam do mundo externo.
@@ -29,7 +29,9 @@ export interface Random {
 export interface NewRoom {
   code: RoomCode;
   host: PlayerId;
+  hostName: string | null;
   matchId: MatchId;
+  bestOf: BestOf;
 }
 
 /** Acesso às salas no banco. Toda regra de jogo fica fora daqui. */
@@ -38,7 +40,9 @@ export interface RoomGateway {
   create(room: NewRoom): Promise<boolean>;
   get(code: RoomCode): Promise<Room | null>;
   /** Ocupa a vaga, se ela ainda estiver livre. Devolve `false` se alguém chegou antes. */
-  claimSlot(code: RoomCode, slot: PlayerSlot, player: PlayerId): Promise<boolean>;
+  claimSlot(code: RoomCode, slot: PlayerSlot, player: PlayerId, name: string | null): Promise<boolean>;
+  /** Troca o apelido exibido na vaga (`null` remove). */
+  setName(code: RoomCode, slot: PlayerSlot, name: string | null): Promise<void>;
   releaseSlot(code: RoomCode, slot: PlayerSlot): Promise<void>;
   deleteRoom(code: RoomCode): Promise<void>;
   /** Avisa a cada mudança na sala; `null` quando ela deixa de existir. */
@@ -68,4 +72,6 @@ export interface SessionStore {
   saveRoom(code: RoomCode | null): void;
   loadPendingMove(): PendingMove | null;
   savePendingMove(move: PendingMove | null): void;
+  loadNickname(): string | null;
+  saveNickname(name: string | null): void;
 }

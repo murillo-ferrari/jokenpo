@@ -22,10 +22,11 @@ describe('toRoom', () => {
     expect(room).toEqual({
       code: CODE,
       createdAt: 1,
+      bestOf: 0,
       currentMatch: 'm2',
       players: {
-        player1: { id: 'alice', connected: true, seenAt: 5, joinedAt: 1 },
-        player2: { id: 'bob', connected: true, seenAt: 5, joinedAt: 1 },
+        player1: { id: 'alice', name: null, connected: true, seenAt: 5, joinedAt: 1 },
+        player2: { id: 'bob', name: null, connected: true, seenAt: 5, joinedAt: 1 },
       },
       rounds: [{ player1: { commit: HASH, reveal: { move: 'rock', nonce: NONCE, at: 9 } } }],
       resetRequest: { by: 'bob', at: 7 },
@@ -40,6 +41,18 @@ describe('toRoom', () => {
   it('jogador malformado é tratado como vaga vazia', () => {
     const room = toRoom(CODE, { createdAt: 1, currentMatch: 'm1', players: { player1: { uid: 'alice' } } });
     expect(room?.players).toEqual({});
+  });
+
+  it('lê formato e apelidos; formato desconhecido vira partida livre', () => {
+    const room = toRoom(CODE, {
+      createdAt: 1,
+      bestOf: 5,
+      currentMatch: 'm1',
+      players: { player1: { ...presence('alice'), name: 'Alice' } },
+    });
+    expect(room?.bestOf).toBe(5);
+    expect(room?.players.player1?.name).toBe('Alice');
+    expect(toRoom(CODE, { createdAt: 1, bestOf: 4, currentMatch: 'm1' })?.bestOf).toBe(0);
   });
 
   it('partida sem rodadas e sem pedido de reset', () => {

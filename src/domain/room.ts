@@ -1,4 +1,4 @@
-import { SLOTS, opponentOf, type MatchId, type PlayerId, type PlayerSlot, type RoomCode, type RoundRecord } from './types';
+import { SLOTS, opponentOf, type BestOf, type MatchId, type PlayerId, type PlayerSlot, type RoomCode, type RoundRecord } from './types';
 
 /**
  * Tempo desconectado depois do qual a vaga de um jogador pode ser liberada por outra pessoa.
@@ -8,6 +8,8 @@ export const STALE_PLAYER_MS = 60_000;
 
 export interface PlayerPresence {
   id: PlayerId;
+  /** Apelido opcional (ver `nickname.ts`). */
+  name: string | null;
   connected: boolean;
   /** Último horário (servidor, ms) em que a conexão mudou de estado. */
   seenAt: number;
@@ -23,6 +25,8 @@ export interface ResetRequest {
 export interface Room {
   code: RoomCode;
   createdAt: number;
+  /** Formato escolhido por quem criou a sala; vale para todas as partidas dela. */
+  bestOf: BestOf;
   players: Partial<Record<PlayerSlot, PlayerPresence>>;
   currentMatch: MatchId;
   /** Rodadas da partida atual, em ordem (índice = número da rodada). */

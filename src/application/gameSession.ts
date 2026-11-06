@@ -1,13 +1,14 @@
 import { summarize, type MatchSummary } from '../domain/match';
+import { normalizeNickname } from '../domain/nickname';
 import { STALE_PLAYER_MS, isAlone, opponentStatus, slotOf, type Room } from '../domain/room';
-import { opponentOf, type Move, type PlayerId, type PlayerSlot, type RoomCode } from '../domain/types';
+import { opponentOf, type BestOf, type Move, type PlayerId, type PlayerSlot, type RoomCode } from '../domain/types';
 import { createRoom } from './createRoom';
 import { joinRoom } from './joinRoom';
 import { leaveRoom } from './leaveRoom';
 import { commitMove, isPendingFor, revealMove, type RoundContext } from './playMove';
 import type { Clock, Identity, Random, RoomGateway, SessionStore, Unsubscribe } from './ports';
 import { acceptReset, dismissReset, requestReset, startFreshMatch } from './resetMatch';
-import { buildPlayingView, type GameView, type Notice } from './view';
+import { buildPlayingView, type GameView, type HomeView, type Notice } from './view';
 
 export interface GameSessionDeps {
   identity: Identity;
@@ -15,6 +16,8 @@ export interface GameSessionDeps {
   clock: Clock;
   random: Random;
   store: SessionStore;
+  /** Partida contra o computador: só muda o que a tela mostra. */
+  vsComputer?: boolean;
 }
 
 type Listener<T> = (value: T) => void;
@@ -79,18 +82,25 @@ export class GameSession {
    * senão, volta para a sala em que estava antes de recarregar a página, se ainda existir.
    */
   async start(inviteCode: string | null = null): Promise<void> {
-    this.player = await this.deps.identity.ensurePlayer();
+    try {
+      await this.ensurePlayer();
+    } catch {
+      // Sem identidade (por exemplo, offline na primeira visita): a tela inicial continua usável,
+      // e criar/entrar tentam de novo. O modo contra o computador não depende disto.
+      this.goHome('unexpected');
+      return;
+    }
     const saved = this.deps.store.loadRoom();
     if (inviteCode) await this.enter(inviteCode, { showErrors: true });
     else if (saved) await this.enter(saved, { showErrors: false });
     else this.goHome(null);
   }
 
-  async createRoom(): Promise<void> {
-    const player = this.requirePlayer();
-    this.setView({ screen: 'home', busy: true, error: null });
+  async createRoom(bestOf: BestOf = 0): Promise<void> {
+    this.setHome(true, null);
     try {
-      const code = await createRoom(this.deps, player);
+      const player = await this.ensurePlayer();
+      const code = await createRoom(this.deps, player, { hostName: this.deps.store.loadNickname(), bestOf });
       this.attach(code);
     } catch {
       this.goHome('unexpected');
@@ -114,6 +124,23 @@ export class GameSession {
       this.committing = false;
       this.render();
     }
+  }
+
+  /** Define o apelido (vazio remove). Vale para esta sala e para as próximas. */
+  async setNickname(input: string): Promise<void> {
+    const name = normalizeNickname(input);
+    this.deps.store.saveNickname(name);
+    if (this.view.screen === 'home') this.setHome(this.view.busy, this.view.error);
+    const code = this.active?.code;
+    const slot = this.active?.slot;
+    if (code && slot) await this.run(() => this.deps.gateway.setName(code, slot, name));
+  }
+
+  /** Revanche depois de uma partida decidida: aceita o pedido do adversário, ou faz o pedido. */
+  async rematch(): Promise<void> {
+    const request = this.room?.resetRequest;
+    if (request && request.by !== this.player) await this.respondToReset(true);
+    else if (!request) await this.requestReset();
   }
 
   async requestReset(): Promise<void> {
@@ -153,10 +180,10 @@ export class GameSession {
   // ---- Entrada na sala ----------------------------------------------------
 
   private async enter(input: string, { showErrors }: { showErrors: boolean }): Promise<void> {
-    const player = this.requirePlayer();
-    this.setView({ screen: 'home', busy: true, error: null });
+    this.setHome(true, null);
     try {
-      const result = await joinRoom(this.deps, input, player);
+      const player = await this.ensurePlayer();
+      const result = await joinRoom(this.deps, input, player, this.deps.store.loadNickname());
       if (result.ok) {
         this.attach(result.code);
         return;
@@ -301,7 +328,7 @@ export class GameSession {
     if (!room || !slot) return;
 
     if (isAlone(room, slot)) {
-      this.setView({ screen: 'waiting', code: room.code });
+      this.setView({ screen: 'waiting', code: room.code, bestOf: room.bestOf });
       this.schedule(room, slot, this.summary(room));
       return;
     }
@@ -319,6 +346,7 @@ export class GameSession {
         myPendingMove: isPendingFor(pending, context) ? pending.move : null,
         now,
         busy: this.committing,
+        vsComputer: this.deps.vsComputer ?? false,
       }),
     );
     this.schedule(room, slot, summary);
@@ -349,7 +377,7 @@ export class GameSession {
   // ---- Auxiliares ---------------------------------------------------------
 
   private summary(room: Room): MatchSummary {
-    return summarize(room.rounds, { now: this.deps.clock.now() });
+    return summarize(room.rounds, { now: this.deps.clock.now(), bestOf: room.bestOf });
   }
 
   private currentRoundContext(): RoundContext | null {
@@ -367,13 +395,22 @@ export class GameSession {
     }
   }
 
+  private async ensurePlayer(): Promise<PlayerId> {
+    this.player ??= await this.deps.identity.ensurePlayer();
+    return this.player;
+  }
+
   private requirePlayer(): PlayerId {
     if (!this.player) throw new Error('Sessão não iniciada: chame start() antes.');
     return this.player;
   }
 
-  private goHome(error: Extract<GameView, { screen: 'home' }>['error']): void {
-    this.setView({ screen: 'home', busy: false, error });
+  private goHome(error: HomeView['error']): void {
+    this.setHome(false, error);
+  }
+
+  private setHome(busy: boolean, error: HomeView['error']): void {
+    this.setView({ screen: 'home', busy, error, nickname: this.deps.store.loadNickname() });
   }
 
   private setView(view: GameView): void {

@@ -3,6 +3,8 @@ import { resolveRound } from './rules';
 import {
   SLOTS,
   opponentOf,
+  winsNeeded,
+  type BestOf,
   type MatchId,
   type Move,
   type PlayerSlot,
@@ -55,8 +57,15 @@ export interface MatchSummary {
   scores: Record<PlayerSlot, number>;
   ties: number;
   history: CompletedRound[];
-  /** A rodada em andamento: sempre existe, já que a partida não tem fim (por enquanto). */
+  /** Quem levou a partida (formato "melhor de N"); `null` enquanto ninguém chegou lá ou na partida livre. */
+  winner: PlayerSlot | null;
+  /** A próxima rodada. Com vencedor definido, ninguém joga mais nela. */
   current: PendingRound;
+}
+
+export interface SummarizeOptions extends EvaluateOptions {
+  /** Formato da partida; 0 (padrão) é partida livre. */
+  bestOf?: BestOf;
 }
 
 export interface EvaluateOptions {
@@ -135,22 +144,29 @@ export function evaluateRound(record: RoundRecord | undefined, index: number, op
 
 /**
  * Calcula o estado da partida a partir das rodadas gravadas, em ordem (índice = número da rodada).
- * Rodadas depois da primeira em aberto são ignoradas.
+ * Rodadas depois da primeira em aberto, ou depois da que decidiu a partida, são ignoradas.
  */
-export function summarize(rounds: readonly (RoundRecord | undefined)[], options: EvaluateOptions): MatchSummary {
+export function summarize(rounds: readonly (RoundRecord | undefined)[], options: SummarizeOptions): MatchSummary {
   const scores: Record<PlayerSlot, number> = { player1: 0, player2: 0 };
   const history: CompletedRound[] = [];
+  const target = winsNeeded(options.bestOf ?? 0);
   let ties = 0;
 
   for (let index = 0; ; index += 1) {
     const evaluation = evaluateRound(rounds[index], index, options);
     if (evaluation.status === 'pending') {
-      return { scores, ties, history, current: evaluation.round };
+      return { scores, ties, history, winner: null, current: evaluation.round };
     }
     const { round } = evaluation;
     history.push(round);
     if (round.outcome === 'tie') ties += 1;
     else scores[round.outcome] += 1;
+
+    const winner = target === null ? undefined : SLOTS.find((slot) => scores[slot] >= target);
+    if (winner) {
+      const next: PendingRound = { index: index + 1, phase: 'choosing', committed: { player1: false, player2: false } };
+      return { scores, ties, history, winner, current: next };
+    }
   }
 }
 

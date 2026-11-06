@@ -18,12 +18,12 @@ import { toRoom } from './roomMapper';
 export class FirebaseRoomGateway implements RoomGateway {
   constructor(private readonly db: Database) {}
 
-  async create({ code, host, matchId }: NewRoom): Promise<boolean> {
+  async create({ code, host, hostName, matchId, bestOf }: NewRoom): Promise<boolean> {
     const result = await runTransaction(
       this.roomRef(code),
       (current: unknown) =>
         current === null
-          ? { createdAt: serverTimestamp(), currentMatch: matchId, players: { player1: newPresence(host) } }
+          ? { createdAt: serverTimestamp(), bestOf, currentMatch: matchId, players: { player1: newPresence(host, hostName) } }
           : undefined, // código já em uso: aborta
       { applyLocally: false },
     );
@@ -36,11 +36,11 @@ export class FirebaseRoomGateway implements RoomGateway {
     });
   }
 
-  async claimSlot(code: RoomCode, slot: PlayerSlot, player: PlayerId): Promise<boolean> {
+  async claimSlot(code: RoomCode, slot: PlayerSlot, player: PlayerId, name: string | null): Promise<boolean> {
     try {
       const result = await runTransaction(
         this.slotRef(code, slot),
-        (current: unknown) => (current === null ? newPresence(player) : undefined),
+        (current: unknown) => (current === null ? newPresence(player, name) : undefined),
         { applyLocally: false },
       );
       return result.committed;
@@ -48,6 +48,10 @@ export class FirebaseRoomGateway implements RoomGateway {
       // As regras recusam se a sala sumiu ou a vaga foi tomada no meio do caminho.
       return false;
     }
+  }
+
+  setName(code: RoomCode, slot: PlayerSlot, name: string | null): Promise<void> {
+    return set(ref(this.db, `rooms/${code}/players/${slot}/name`), name);
   }
 
   releaseSlot(code: RoomCode, slot: PlayerSlot): Promise<void> {
@@ -116,6 +120,6 @@ export class FirebaseRoomGateway implements RoomGateway {
   }
 }
 
-function newPresence(player: PlayerId) {
-  return { uid: player, connected: true, seenAt: serverTimestamp(), joinedAt: serverTimestamp() };
+function newPresence(player: PlayerId, name: string | null) {
+  return { uid: player, name, connected: true, seenAt: serverTimestamp(), joinedAt: serverTimestamp() };
 }

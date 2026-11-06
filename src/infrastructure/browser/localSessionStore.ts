@@ -1,10 +1,12 @@
 import type { PendingMove, SessionStore } from '../../application/ports';
 import { isNonce } from '../../domain/commitment';
+import { normalizeNickname } from '../../domain/nickname';
 import { parseRoomCode } from '../../domain/roomCode';
 import { isMove } from '../../domain/types';
 
 const ROOM_KEY = 'jokenpo:room';
 const PENDING_MOVE_KEY = 'jokenpo:pending-move';
+const NICKNAME_KEY = 'jokenpo:nickname';
 
 /**
  * Guarda a sala atual e a jogada ainda não revelada no `localStorage`, para sobreviverem a um F5.
@@ -34,6 +36,14 @@ export class LocalSessionStore implements SessionStore {
 
   savePendingMove(move: PendingMove | null) {
     this.write(PENDING_MOVE_KEY, move ? JSON.stringify(move) : null);
+  }
+
+  loadNickname(): string | null {
+    return normalizeNickname(this.read(NICKNAME_KEY) ?? '');
+  }
+
+  saveNickname(name: string | null) {
+    this.write(NICKNAME_KEY, name);
   }
 
   private read(key: string): string | null {
