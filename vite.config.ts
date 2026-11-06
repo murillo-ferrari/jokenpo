@@ -6,7 +6,7 @@ export default defineConfig({
   base: '/jokenpo/',
   plugins: [preact()],
   test: {
-    include: ['test/**/*.test.ts'],
+    include: ['test/**/*.test.{ts,tsx}'],
     // Testes de integração precisam dos emuladores: rodam com `npm run test:emulator`.
     exclude: ['test/emulator/**'],
   },

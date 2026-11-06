@@ -262,24 +262,35 @@ A antiga Fase 0, uma correção emergencial no código atual, foi descartada: a 
   - 8 da conversão dos dados do banco;
   - 1 de ponta a ponta no emulador: criar, entrar, jogar, resetar e sair, com o gateway real e as regras valendo.
 
-### Fase 4: interface (≈1 dia)
+### Fase 4: interface (≈1 dia) ✅ concluída em 06/11/2026 (aguardando commit)
 
-- [ ] Telas Início, Esperando e Jogo renderizadas a partir do view model; sem `style.display` manual.
-- [ ] Interface em pt-BR por padrão, com seletor de inglês:
-  - textos em `i18n/pt-BR.ts` e `i18n/en.ts`, com o mesmo tipo de chaves;
+- [x] Telas Início, Esperando e Jogo renderizadas a partir do `GameView`; sem `style.display` manual (B12).
+- [x] Interface em pt-BR por padrão, com seletor de inglês (PT/EN no cabeçalho):
+  - textos em `i18n/pt-BR.ts` e `i18n/en.ts`; o tipo `Messages` obriga os dois a terem as mesmas chaves;
   - a escolha fica salva no `localStorage`;
-  - o `lang` do `<html>` acompanha o idioma escolhido.
-- [ ] Tokens de cor em `:root`, tema escuro com `prefers-color-scheme` e contraste ≥ 4,5:1 em todo texto.
-- [ ] `ConfirmDialog` com `<dialog>` nativo (foco, Esc, `aria-modal`); toasts no lugar de todos os `alert()`.
-- [ ] Região `aria-live` para o resultado da rodada; `:focus-visible`; uma única `<main>`.
-- [ ] Botão "Sair da sala" na espera e no jogo; aviso "aguardando resposta" ao pedir reset, com opção de cancelar.
-- [ ] Link de convite `?sala=ABCD`, com entrada automática ao abrir, mais Web Share API no celular e cópia como alternativa.
-- [ ] Animação curta de revelação ("Jo… Ken… Pô!") respeitando `prefers-reduced-motion`.
+  - o `lang` e o título da página acompanham o idioma escolhido.
+- [x] Tokens de cor em `tokens.css`, com tema escuro por `prefers-color-scheme`. O contraste ≥ 4,5:1 é conferido por `test/contrast.test.ts` em 18 pares de cor por tema. O teste pegou o verde de vitória sobre fundo cinza com 4,4:1, que foi corrigido.
+- [x] `ConfirmDialog` com `<dialog>` nativo (foco, Esc, modal), usado para o reset recebido e para confirmar a saída. Toasts substituem todos os `alert()`.
+- [x] Acessibilidade:
+  - resultado da rodada anunciado por `aria-live` depois da contagem;
+  - status da rodada com `role="status"`;
+  - erros do campo com `role="alert"` e `aria-invalid`;
+  - `:focus-visible`;
+  - uma única `<main>`;
+  - botões de jogada com `aria-pressed`.
+- [x] Botão "Sair da sala" na espera e no jogo, com confirmação no jogo. Aviso "esperando resposta" ao pedir reset, com opção de cancelar.
+- [x] Link de convite `?sala=ABCD`: entra direto na sala, e o parâmetro some da URL depois de lido. Web Share API no celular e cópia do link como alternativa; também dá para copiar só o código.
+- [x] Animação "Jo… Ken… Pô!" ("Rock… Paper… Scissors!" em inglês) antes de mostrar a rodada, desligada com `prefers-reduced-motion`.
+- [x] Histórico das rodadas anteriores em `<details>`. Este item era da Fase 5; saiu de graça com o `GameView`.
+- [x] Testes:
+  - 9 de interface com `happy-dom` e Testing Library;
+  - 36 de contraste;
+  - verificação manual no Chrome com os emuladores e dois jogadores: convite, rodada, reset e avisos, sem erros no console.
 
 ### Fase 5: funcionalidades novas (opcional, escolher)
 
 - [ ] **Melhor de 3/5/7**, com tela de vencedor e "revanche".
-- [ ] **Histórico das rodadas** da partida (é só renderizar `rounds`).
+- [x] **Histórico das rodadas** da partida (feito na Fase 4).
 - [ ] **Apelidos** dos jogadores.
 - [ ] **Modo contra o computador**, sem Firebase, reaproveitando o domínio. Também serve para testar a interface sem banco.
 - [ ] **Indicador "oponente está online/digitando"**, aproveitando a presença.

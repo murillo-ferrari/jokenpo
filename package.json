@@ -26,8 +26,10 @@
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",
     "@preact/preset-vite": "^2.10.6",
+    "@testing-library/preact": "^3.2.6",
     "@types/node": "^26.6.6",
     "firebase-tools": "^15.35.0",
+    "happy-dom": "^21.0.4",
     "typescript": "^7.0.2",
     "vite": "^8.3.6",
     "vitest": "^5.1.0"

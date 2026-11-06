@@ -1,40 +1,75 @@
-import { useEffect, useState } from 'preact/hooks';
-import type { Identity } from '../application/ports';
-
-type Connection =
-  | { status: 'connecting' }
-  | { status: 'ready'; playerId: string }
-  | { status: 'error'; message: string };
+import { useCallback } from 'preact/hooks';
+import type { GameSession } from '../application/gameSession';
+import type { Notice } from '../application/view';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
+import { ToastProvider, useToast } from './components/Toasts';
+import { useGameView, useNotices } from './hooks/useGameSession';
+import { I18nProvider, useI18n, type Language } from './i18n';
+import { GameScreen } from './screens/GameScreen';
+import { HomeScreen } from './screens/HomeScreen';
+import { WaitingScreen } from './screens/WaitingScreen';
 
 interface AppProps {
-  identity: Identity;
+  session: GameSession;
+  language: Language;
 }
 
-/**
- * Tela provisória da Fase 1: só confirma que o login anônimo funciona.
- * As telas do jogo (Início, Esperando, Jogo) chegam na Fase 4.
- */
-export function App({ identity }: AppProps) {
-  const [connection, setConnection] = useState<Connection>({ status: 'connecting' });
+export function App({ session, language }: AppProps) {
+  return (
+    <I18nProvider initial={language}>
+      <ToastProvider>
+        <Shell session={session} />
+      </ToastProvider>
+    </I18nProvider>
+  );
+}
 
-  useEffect(() => {
-    identity
-      .ensurePlayer()
-      .then((playerId) => setConnection({ status: 'ready', playerId }))
-      .catch((error: unknown) =>
-        setConnection({ status: 'error', message: error instanceof Error ? error.message : String(error) }),
-      );
-  }, [identity]);
+function Shell({ session }: { session: GameSession }) {
+  const { t } = useI18n();
+  const toast = useToast();
+  const view = useGameView(session);
+  useNotices(
+    session,
+    useCallback((notice: Notice) => toast(t.notices[notice]), [toast, t]),
+  );
 
   return (
-    <main>
-      <h1>Jokenpô Online</h1>
-      <p>Nova versão em construção.</p>
-      <p role="status">
-        {connection.status === 'connecting' && 'Conectando…'}
-        {connection.status === 'ready' && `Conectado como ${connection.playerId.slice(0, 6)}…`}
-        {connection.status === 'error' && `Erro ao conectar: ${connection.message}`}
-      </p>
+    <>
+      <header class="app-header">
+        <h1>
+          <span aria-hidden="true">✊✋✌️</span> {t.appTitle}
+        </h1>
+        <LanguageSwitcher />
+      </header>
+      <main class="card">
+        {view.screen === 'loading' && (
+          <p class="busy" role="status">
+            <span class="spinner" aria-hidden="true" /> {t.loading}
+          </p>
+        )}
+        {view.screen === 'home' && <HomeScreen view={view} session={session} />}
+        {view.screen === 'waiting' && <WaitingScreen view={view} session={session} />}
+        {view.screen === 'playing' && <GameScreen view={view} session={session} />}
+      </main>
+    </>
+  );
+}
+
+/** Tela mostrada se o jogo nem conseguir iniciar (por exemplo, config do Firebase ausente). */
+export function StartupError({ language }: { language: Language }) {
+  return (
+    <I18nProvider initial={language}>
+      <StartupErrorMessage />
+    </I18nProvider>
+  );
+}
+
+function StartupErrorMessage() {
+  const { t } = useI18n();
+  return (
+    <main class="card">
+      <h1>{t.appTitle}</h1>
+      <p role="alert">{t.configError}</p>
     </main>
   );
 }

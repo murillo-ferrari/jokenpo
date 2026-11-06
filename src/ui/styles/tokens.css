@@ -1,0 +1,73 @@
+/*
+ * Tokens de cor, espaço e tipografia. Todo texto tem contraste ≥ 4,5:1 com o fundo em que aparece
+ * (conferido por test/contrast.test.ts). O tema escuro segue a preferência do sistema.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius: 12px;
+  --radius-small: 8px;
+
+  /* Tema claro */
+  --bg: #f4f5f9;
+  --surface: #ffffff;
+  --surface-muted: #eef0f5;
+  --text: #1a1d26;
+  --text-muted: #4f5666;
+  --border: #d5d9e3;
+
+  --primary: #1d4ed8;
+  --primary-hover: #1e40af;
+  --on-primary: #ffffff;
+  --danger: #b91c1c;
+  --danger-hover: #991b1b;
+  --on-danger: #ffffff;
+
+  --win: #166534;
+  --loss: #b91c1c;
+  --tie: #4f5666;
+  --warning-bg: #fef3c7;
+  --warning-text: #78350f;
+
+  --focus: #2563eb;
+  --shadow: 0 8px 24px rgb(15 23 42 / 0.08);
+  --toast-bg: #1a1d26;
+  --toast-text: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1117;
+    --surface: #171b24;
+    --surface-muted: #202532;
+    --text: #e8eaf0;
+    --text-muted: #a5acbb;
+    --border: #323949;
+
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --danger: #dc2626;
+    --danger-hover: #b91c1c;
+    --on-danger: #ffffff;
+
+    --win: #4ade80;
+    --loss: #f87171;
+    --tie: #a5acbb;
+    --warning-bg: #422006;
+    --warning-text: #fde68a;
+
+    --focus: #60a5fa;
+    --shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+    --toast-bg: #e8eaf0;
+    --toast-text: #0e1117;
+  }
+}
