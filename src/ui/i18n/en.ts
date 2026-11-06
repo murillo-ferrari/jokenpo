@@ -6,6 +6,7 @@ export const en: Messages = {
   loading: 'Loading…',
   configError: "The game couldn't start. Try reloading the page.",
   language: { label: 'Language' },
+  sound: { label: 'Game sounds' },
 
   moves: { rock: 'Rock', paper: 'Paper', scissors: 'Scissors' },
 
@@ -13,6 +14,13 @@ export const en: Messages = {
     label: 'Match format',
     options: { 0: 'Endless', 3: 'Best of 3', 5: 'Best of 5', 7: 'Best of 7' },
     summary: (bestOf, wins) => `Best of ${bestOf} · first to ${wins}`,
+  },
+
+  choice: {
+    label: 'Time to pick',
+    hint: 'Starts once your opponent picks. Not used against the computer.',
+    option: (seconds) => `${seconds}s`,
+    summary: (seconds) => `${seconds}s to pick`,
   },
 
   home: {
@@ -64,6 +72,8 @@ export const en: Messages = {
     ties: 'Ties',
     scoreSummary: (me, opponent, ties) => `Score: you ${me}, opponent ${opponent}, ${ties} ties.`,
     movesLabel: 'Your move',
+    nextRound: 'Pick your move for the next round.',
+    noRoundsYet: 'No rounds yet.',
     chooseMove: 'Pick your move.',
     youChose: (move) => `You picked ${move}.`,
     waitingOpponent: 'Waiting for your opponent to pick…',
@@ -77,12 +87,19 @@ export const en: Messages = {
         win: "Your opponent didn't reveal their move in time.",
         loss: "Your move wasn't revealed in time.",
       },
+      'choice-timeout': {
+        win: "Your opponent didn't pick a move in time.",
+        loss: "You didn't pick a move in time.",
+      },
       'invalid-reveal': {
         win: "Your opponent's revealed move didn't match their pick.",
         loss: "Your revealed move didn't match your pick.",
       },
       void: 'Round voided.',
     },
+    endingTags: { 'reveal-timeout': 'by forfeit', 'choice-timeout': 'by forfeit', 'invalid-reveal': 'invalid move', void: 'voided' },
+    secondsLeft: (seconds) => `${seconds}s`,
+    choiceDeadlineNotice: (seconds) => `You have ${seconds} seconds to pick.`,
     noMove: 'no reveal',
     roundSummary: (n, me, opponent, result) => `Round ${n}: you ${me}, opponent ${opponent}. ${result}`,
     history: (count) => `Previous rounds (${count})`,

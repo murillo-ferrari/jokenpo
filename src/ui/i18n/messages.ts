@@ -8,6 +8,7 @@ export interface Messages {
   loading: string;
   configError: string;
   language: { label: string };
+  sound: { label: string };
 
   moves: Record<Move, string>;
 
@@ -16,6 +17,14 @@ export interface Messages {
     options: Record<0 | 3 | 5 | 7, string>;
     /** Linha do placar, ex.: "Melhor de 5 · vence quem fizer 3". */
     summary: (bestOf: number, wins: number) => string;
+  };
+
+  choice: {
+    label: string;
+    hint: string;
+    option: (seconds: number) => string;
+    /** Trecho da linha do placar, ex.: "10 s para escolher". */
+    summary: (seconds: number) => string;
   };
 
   home: {
@@ -60,6 +69,8 @@ export interface Messages {
     ties: string;
     scoreSummary: (me: number, opponent: number, ties: number) => string;
     movesLabel: string;
+    nextRound: string;
+    noRoundsYet: string;
     chooseMove: string;
     youChose: (move: string) => string;
     waitingOpponent: string;
@@ -68,7 +79,18 @@ export interface Messages {
     opponentDisconnected: string;
     countdown: [string, string, string];
     results: Record<RoundResult, string>;
-    endings: { 'reveal-timeout': Record<'win' | 'loss', string>; 'invalid-reveal': Record<'win' | 'loss', string>; void: string };
+    endings: {
+      'reveal-timeout': Record<'win' | 'loss', string>;
+      'choice-timeout': Record<'win' | 'loss', string>;
+      'invalid-reveal': Record<'win' | 'loss', string>;
+      void: string;
+    };
+    /** Etiqueta curta ao lado do resultado quando a rodada não terminou do jeito normal. */
+    endingTags: Record<'reveal-timeout' | 'choice-timeout' | 'invalid-reveal' | 'void', string>;
+    /** Contagem do prazo para escolher, ex.: "12 s". */
+    secondsLeft: (seconds: number) => string;
+    /** Texto para leitores de tela quando o prazo começa. */
+    choiceDeadlineNotice: (seconds: number) => string;
     noMove: string;
     roundSummary: (n: number, me: string, opponent: string, result: string) => string;
     history: (count: number) => string;

@@ -1,6 +1,6 @@
 import type { Clock, NewRoom, PendingMove, RoomGateway, SessionStore, Unsubscribe } from '../../application/ports';
 import type { PlayerPresence, ResetRequest, Room } from '../../domain/room';
-import type { BestOf, MatchId, Move, PlayerId, PlayerSlot, RoomCode, RoundRecord } from '../../domain/types';
+import type { BestOf, ChoiceSeconds, MatchId, Move, PlayerId, PlayerSlot, RoomCode, RoundRecord } from '../../domain/types';
 
 /*
  * Salas em memória, com o mesmo comportamento que o jogo espera do Realtime Database:
@@ -9,11 +9,15 @@ import type { BestOf, MatchId, Move, PlayerId, PlayerSlot, RoomCode, RoundRecord
  * Algumas regras do banco são imitadas (commit e reveal únicos), para o fluxo se comportar igual.
  */
 
+/** Presença como guardada: uma lista de conexões (uma por aba); "conectado" = alguma conexão ativa. */
+type StoredPresence = Omit<PlayerPresence, 'connected'> & { connections: string[] };
+
 interface StoredRoom {
   createdAt: number;
   bestOf: BestOf;
+  choiceSeconds: ChoiceSeconds;
   currentMatch: MatchId;
-  players: Partial<Record<PlayerSlot, PlayerPresence>>;
+  players: Partial<Record<PlayerSlot, StoredPresence>>;
   matches: Record<string, (RoundRecord | undefined)[]>;
   resetRequest: ResetRequest | null;
 }
@@ -32,11 +36,17 @@ export class MemoryRoomServer {
   snapshot(code: RoomCode): Room | null {
     const stored = this.rooms.get(code);
     if (!stored) return null;
+    const players: Room['players'] = {};
+    for (const [slot, presence] of Object.entries(stored.players) as [PlayerSlot, StoredPresence][]) {
+      const { connections, ...rest } = presence;
+      players[slot] = { ...rest, connected: connections.length > 0 };
+    }
     return structuredClone({
       code,
       createdAt: stored.createdAt,
       bestOf: stored.bestOf,
-      players: stored.players,
+      choiceSeconds: stored.choiceSeconds,
+      players,
       currentMatch: stored.currentMatch,
       rounds: stored.matches[stored.currentMatch] ?? [],
       resetRequest: stored.resetRequest,
@@ -45,10 +55,16 @@ export class MemoryRoomServer {
 
   /** Aplica uma mudança e avisa quem observa a sala. `null` apaga; `undefined` não muda nada. */
   mutate(code: RoomCode, change: (room: StoredRoom | undefined) => StoredRoom | null | undefined): void {
-    const result = change(this.rooms.get(code));
-    if (result === null) this.rooms.delete(code);
-    else if (result) this.rooms.set(code, result);
+    this.store(code, change(this.rooms.get(code)));
     this.notify(code);
+  }
+
+  private store(code: RoomCode, result: StoredRoom | null | undefined): void {
+    if (result === null) {
+      this.rooms.delete(code);
+      return;
+    }
+    if (result) this.rooms.set(code, result);
   }
 
   watch(code: RoomCode, listener: Listener): Unsubscribe {
@@ -72,19 +88,33 @@ export class MemoryRoomServer {
     return () => set.delete(key);
   }
 
-  /** A conexão do jogador cai: executa o equivalente aos onDisconnect registrados. */
+  /** Todas as conexões do jogador caem: executa o equivalente aos onDisconnect registrados. */
   disconnect(player: PlayerId): void {
     for (const key of this.presences.get(player) ?? []) {
-      const [code, slot] = key.split('/') as [RoomCode, PlayerSlot];
-      this.mutate(code, (room) => {
-        const presence = room?.players[slot];
-        if (!room || !presence || presence.id !== player) return undefined;
-        presence.connected = false;
-        presence.seenAt = this.clock.now();
-        return room;
-      });
+      const [code, slot, connection] = key.split('/') as [RoomCode, PlayerSlot, string];
+      this.dropConnection(code, slot, connection);
     }
     this.presences.delete(player);
+  }
+
+  addConnection(code: RoomCode, slot: PlayerSlot, player: PlayerId, connection: string): void {
+    this.mutate(code, (room) => {
+      const presence = room?.players[slot];
+      if (!room || !presence || presence.id !== player || presence.connections.includes(connection)) return undefined;
+      presence.connections.push(connection);
+      presence.seenAt = this.clock.now();
+      return room;
+    });
+  }
+
+  dropConnection(code: RoomCode, slot: PlayerSlot, connection: string): void {
+    this.mutate(code, (room) => {
+      const presence = room?.players[slot];
+      if (!room || !presence || !presence.connections.includes(connection)) return undefined;
+      presence.connections = presence.connections.filter((id) => id !== connection);
+      presence.seenAt = this.clock.now();
+      return room;
+    });
   }
 
   private notify(code: RoomCode): void {
@@ -98,21 +128,24 @@ export class MemoryRoomServer {
 
 /** `RoomGateway` de um jogador sobre o `MemoryRoomServer`. */
 export class MemoryRoomGateway implements RoomGateway {
+  private static connections = 0;
+
   constructor(
     private readonly server: MemoryRoomServer,
     private readonly player: PlayerId,
   ) {}
 
-  private presence(id: PlayerId, name: string | null): PlayerPresence {
+  private presence(id: PlayerId, name: string | null): StoredPresence {
     const now = this.server.clock.now();
-    return { id, name, connected: true, seenAt: now, joinedAt: now };
+    return { id, name, connections: [], seenAt: now, joinedAt: now };
   }
 
-  async create({ code, host, hostName, matchId, bestOf }: NewRoom): Promise<boolean> {
+  async create({ code, host, hostName, matchId, bestOf, choiceSeconds }: NewRoom): Promise<boolean> {
     if (this.server.rooms.has(code)) return false;
     this.server.mutate(code, () => ({
       createdAt: this.server.clock.now(),
       bestOf,
+      choiceSeconds,
       currentMatch: matchId,
       players: { player1: this.presence(host, hostName) },
       matches: {},
@@ -161,21 +194,22 @@ export class MemoryRoomGateway implements RoomGateway {
     return this.server.watch(code, onChange);
   }
 
+  /** Uma conexão por chamada (uma por aba), como no Firebase. */
   trackPresence(code: RoomCode, slot: PlayerSlot): Unsubscribe {
-    this.server.mutate(code, (room) => {
-      const presence = room?.players[slot];
-      if (!room || !presence || presence.id !== this.player || presence.connected) return undefined;
-      presence.connected = true;
-      presence.seenAt = this.server.clock.now();
-      return room;
-    });
-    return this.server.trackPresence(this.player, `${code}/${slot}`);
+    MemoryRoomGateway.connections += 1;
+    const connection = `c${MemoryRoomGateway.connections}`;
+    this.server.addConnection(code, slot, this.player, connection);
+    const untrack = this.server.trackPresence(this.player, `${code}/${slot}/${connection}`);
+    return () => {
+      untrack();
+      this.server.dropConnection(code, slot, connection);
+    };
   }
 
   async commit(code: RoomCode, matchId: MatchId, round: number, slot: PlayerSlot, commit: string): Promise<void> {
     this.writeRound(code, matchId, round, (record) => {
       if (record[slot]) throw new Error('permission_denied: commit já existe');
-      record[slot] = { commit };
+      record[slot] = { commit, committedAt: this.server.clock.now() };
     });
   }
 

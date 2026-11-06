@@ -39,7 +39,7 @@ export interface TestPlayer {
 export function createPlayer(
   server: MemoryRoomServer,
   name: string,
-  options: { store?: MemorySessionStore; random?: Random; vsComputer?: boolean } = {},
+  options: { store?: MemorySessionStore; random?: Random; vsComputer?: boolean; choiceTimeoutMs?: number | null } = {},
 ): TestPlayer {
   const id = toPlayerId(name);
   const store = options.store ?? new MemorySessionStore();
@@ -51,6 +51,7 @@ export function createPlayer(
     random: options.random ?? nodeRandom,
     store,
     vsComputer: options.vsComputer ?? false,
+    choiceTimeoutMs: options.choiceTimeoutMs,
   });
   const notices: Notice[] = [];
   session.onNotice((notice) => notices.push(notice));

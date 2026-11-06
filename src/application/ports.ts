@@ -1,5 +1,5 @@
 import type { Room } from '../domain/room';
-import type { BestOf, MatchId, Move, PlayerId, PlayerSlot, RoomCode } from '../domain/types';
+import type { BestOf, ChoiceSeconds, MatchId, Move, PlayerId, PlayerSlot, RoomCode } from '../domain/types';
 
 /**
  * Portas: o que os casos de uso precisam do mundo externo.
@@ -32,6 +32,7 @@ export interface NewRoom {
   hostName: string | null;
   matchId: MatchId;
   bestOf: BestOf;
+  choiceSeconds: ChoiceSeconds;
 }
 
 /** Acesso às salas no banco. Toda regra de jogo fica fora daqui. */

@@ -1,24 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { commitFor } from '../src/domain/commitment';
-import { DEFAULT_REVEAL_TIMEOUT_MS, evaluateRound, generateMatchId, summarize } from '../src/domain/match';
+import { DEFAULT_CHOICE_TIMEOUT_MS, DEFAULT_REVEAL_TIMEOUT_MS, evaluateRound, generateMatchId, summarize } from '../src/domain/match';
 import type { Move, RoundRecord, SlotEntry } from '../src/domain/types';
 
 const NONCE = 'a'.repeat(32);
 const T0 = 1_000_000;
 const TIMEOUT = DEFAULT_REVEAL_TIMEOUT_MS;
+const CHOICE = DEFAULT_CHOICE_TIMEOUT_MS;
 
 /** Só o commit (jogou, mas ainda não revelou). */
-const committed = (move: Move): SlotEntry => ({ commit: commitFor(move, NONCE) });
+const committed = (move: Move, at = T0): SlotEntry => ({ commit: commitFor(move, NONCE), committedAt: at });
 
 /** Commit + reveal válido, revelado no instante `at`. */
 const revealed = (move: Move, at = T0): SlotEntry => ({
   commit: commitFor(move, NONCE),
+  committedAt: T0,
   reveal: { move, nonce: NONCE, at },
 });
 
 /** Commit de uma jogada, mas reveal de outra (trapaça ou bug). */
 const cheated = (committedMove: Move, revealedMove: Move, at = T0): SlotEntry => ({
   commit: commitFor(committedMove, NONCE),
+  committedAt: T0,
   reveal: { move: revealedMove, nonce: NONCE, at },
 });
 
@@ -30,15 +33,15 @@ describe('evaluateRound: rodada em aberto', () => {
   it('sem nenhuma jogada, está na fase de escolha', () => {
     expect(evaluateRound(undefined, 0, at(T0))).toEqual({
       status: 'pending',
-      round: { index: 0, phase: 'choosing', committed: { player1: false, player2: false } },
+      round: { index: 0, phase: 'choosing', committed: { player1: false, player2: false }, deadline: null },
     });
   });
 
-  it('mostra quem já escolheu, sem revelar a jogada', () => {
+  it('mostra quem já escolheu, sem revelar a jogada, e o prazo do outro para escolher', () => {
     const result = evaluateRound({ player1: committed('rock') }, 0, at(T0));
     expect(result).toEqual({
       status: 'pending',
-      round: { index: 0, phase: 'choosing', committed: { player1: true, player2: false } },
+      round: { index: 0, phase: 'choosing', committed: { player1: true, player2: false }, deadline: T0 + CHOICE },
     });
   });
 
@@ -119,6 +122,45 @@ describe('evaluateRound: rodada concluída', () => {
   });
 });
 
+describe('evaluateRound: prazo para escolher', () => {
+  it('quem não escolhe no prazo perde a rodada por W.O.', () => {
+    const result = evaluateRound({ player1: committed('rock') }, 0, at(T0 + CHOICE + 1));
+    expect(result).toEqual({
+      status: 'complete',
+      round: { index: 0, outcome: 'player1', ending: 'choice-timeout', moves: {} },
+    });
+  });
+
+  it('escolher exatamente no limite ainda vale', () => {
+    const record: RoundRecord = { player1: committed('rock'), player2: committed('paper', T0 + CHOICE) };
+    expect(evaluateRound(record, 0, at(T0 + CHOICE)).status).toBe('pending');
+  });
+
+  it('escolher depois do prazo não muda o W.O. (o resultado não depende de quando se olha)', () => {
+    const record: RoundRecord = { player1: committed('rock', T0 + CHOICE + 1), player2: committed('paper') };
+    for (const now of [T0 + CHOICE + 2, T0 + 10 * CHOICE]) {
+      const result = evaluateRound(record, 0, at(now));
+      expect(result.status === 'complete' && result.round).toMatchObject({ outcome: 'player2', ending: 'choice-timeout' });
+    }
+  });
+
+  it('sem ninguém ter escolhido, não há prazo correndo', () => {
+    const result = evaluateRound(undefined, 0, at(T0 + 100 * CHOICE));
+    expect(result.status === 'pending' && result.round).toMatchObject({ phase: 'choosing', deadline: null });
+  });
+
+  it('com o prazo desligado (contra o computador), o jogo espera indefinidamente', () => {
+    const result = evaluateRound({ player1: committed('rock') }, 0, { now: T0 + 100 * CHOICE, choiceTimeoutMs: null });
+    expect(result.status === 'pending' && result.round).toMatchObject({ phase: 'choosing', deadline: null });
+  });
+
+  it('conta no placar', () => {
+    const summary = summarize([{ player2: committed('rock') }], at(T0 + CHOICE + 1));
+    expect(summary.scores).toEqual({ player1: 0, player2: 1 });
+    expect(summary.current.index).toBe(1);
+  });
+});
+
 describe('summarize', () => {
   it('partida nova: placar zerado na rodada 0', () => {
     expect(summarize([], at(T0))).toEqual({
@@ -126,7 +168,7 @@ describe('summarize', () => {
       ties: 0,
       history: [],
       winner: null,
-      current: { index: 0, phase: 'choosing', committed: { player1: false, player2: false } },
+      current: { index: 0, phase: 'choosing', committed: { player1: false, player2: false }, deadline: null },
     });
   });
 

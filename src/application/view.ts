@@ -1,6 +1,6 @@
 import type { MatchSummary, RoundEnding } from '../domain/match';
 import { opponentStatus, type Room } from '../domain/room';
-import { opponentOf, winsNeeded, type BestOf, type Move, type PlayerId, type PlayerSlot, type RoomCode } from '../domain/types';
+import { opponentOf, winsNeeded, type BestOf, type ChoiceSeconds, type Move, type PlayerId, type PlayerSlot, type RoomCode } from '../domain/types';
 import type { JoinError } from './joinRoom';
 
 /*
@@ -49,6 +49,10 @@ export interface PlayingView {
   opponent: 'connected' | 'disconnected';
   /** Horário (servidor) até quando o adversário pode revelar; `null` se não há prazo correndo. */
   revealDeadline: number | null;
+  /** Horário (servidor) até quando o atrasado pode escolher; `null` se não há prazo correndo. */
+  choiceDeadline: number | null;
+  /** Tempo para escolher definido na sala. */
+  choiceSeconds: ChoiceSeconds;
   lastRound: LastRoundView | null;
   history: LastRoundView[];
   reset: ResetState;
@@ -139,6 +143,8 @@ export function buildPlayingView({ room, mySlot, me, summary, myPendingMove, now
     canPlay: !finished && current.phase === 'choosing' && !iHaveChosen && !busy && status === 'connected',
     opponent: status === 'connected' ? 'connected' : 'disconnected',
     revealDeadline: !finished && current.phase === 'revealing' ? current.deadline : null,
+    choiceDeadline: !finished && current.phase === 'choosing' ? current.deadline : null,
+    choiceSeconds: room.choiceSeconds,
     lastRound: history.at(-1) ?? null,
     history,
     reset,

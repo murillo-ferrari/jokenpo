@@ -55,6 +55,12 @@ describe('jogar contra o computador', () => {
     expect(again).toMatchObject({ scores: { me: 0, opponent: 0 }, bestOf: 3 });
   });
 
+  it('contra o computador não há prazo para escolher', async () => {
+    game = await startComputerGame(0, null, { thinkingMs: [1, 2] });
+    const view = (await waitForView((v) => isPlaying(v) && v.opponentHasChosen)) as PlayingView;
+    expect(view.choiceDeadline).toBeNull();
+  });
+
   it('sair encerra a partida e volta à tela inicial', async () => {
     game = await startComputerGame(0, null, { thinkingMs: [1, 2] });
     await waitForView(isPlaying);

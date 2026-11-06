@@ -1,6 +1,6 @@
 import { generateMatchId } from '../domain/match';
 import { generateRoomCode } from '../domain/roomCode';
-import type { BestOf, PlayerId, RoomCode } from '../domain/types';
+import type { BestOf, ChoiceSeconds, PlayerId, RoomCode } from '../domain/types';
 import type { Random, RoomGateway } from './ports';
 
 /** Com 31⁴ ≈ 923 mil códigos, repetir 5 vezes seguidas só acontece se algo estiver errado. */
@@ -13,7 +13,7 @@ const MAX_ATTEMPTS = 5;
 export async function createRoom(
   deps: { gateway: RoomGateway; random: Random },
   host: PlayerId,
-  options: { hostName: string | null; bestOf: BestOf },
+  options: { hostName: string | null; bestOf: BestOf; choiceSeconds: ChoiceSeconds },
 ): Promise<RoomCode> {
   const random = () => deps.random.next();
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {

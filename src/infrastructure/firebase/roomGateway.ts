@@ -1,6 +1,7 @@
 import {
   onDisconnect,
   onValue,
+  push,
   ref,
   remove,
   runTransaction,
@@ -18,12 +19,18 @@ import { toRoom } from './roomMapper';
 export class FirebaseRoomGateway implements RoomGateway {
   constructor(private readonly db: Database) {}
 
-  async create({ code, host, hostName, matchId, bestOf }: NewRoom): Promise<boolean> {
+  async create({ code, host, hostName, matchId, bestOf, choiceSeconds }: NewRoom): Promise<boolean> {
     const result = await runTransaction(
       this.roomRef(code),
       (current: unknown) =>
         current === null
-          ? { createdAt: serverTimestamp(), bestOf, currentMatch: matchId, players: { player1: newPresence(host, hostName) } }
+          ? {
+              createdAt: serverTimestamp(),
+              bestOf,
+              choiceSeconds,
+              currentMatch: matchId,
+              players: { player1: newPresence(host, hostName) },
+            }
           : undefined, // código já em uso: aborta
       { applyLocally: false },
     );
@@ -66,25 +73,34 @@ export class FirebaseRoomGateway implements RoomGateway {
     return onValue(this.roomRef(code), (snapshot) => onChange(toRoom(code, snapshot.val())), onError);
   }
 
+  /**
+   * Cada aba registra a própria conexão em `players/{vaga}/connections/{id}`. O jogador está
+   * conectado enquanto houver alguma; fechar uma de duas abas não o desconecta.
+   */
   trackPresence(code: RoomCode, slot: PlayerSlot): Unsubscribe {
     const slotRef = this.slotRef(code, slot);
-    const offline = { connected: false, seenAt: serverTimestamp() };
+    const connectionId = push(ref(this.db, `rooms/${code}/players/${slot}/connections`)).key as string;
+    const path = `connections/${connectionId}`;
+    // Ao cair, o servidor remove só esta conexão e marca a hora (base do prazo de 60 s da vaga).
+    const gone = { [path]: null, seenAt: serverTimestamp() };
     // `.info/connected` volta a `true` a cada reconexão: o onDisconnect é registrado de novo.
     const stop = onValue(ref(this.db, '.info/connected'), (snapshot) => {
       if (snapshot.val() !== true) return;
       void onDisconnect(slotRef)
-        .update(offline)
-        .then(() => update(slotRef, { connected: true, seenAt: serverTimestamp() }))
+        .update(gone)
+        .then(() => update(slotRef, { [path]: true, seenAt: serverTimestamp() }))
         .catch(() => undefined); // vaga já liberada: nada a marcar
     });
     return () => {
       stop();
       void onDisconnect(slotRef).cancel().catch(() => undefined);
+      void update(slotRef, gone).catch(() => undefined); // saída explícita (ou a vaga já não existe)
     };
   }
 
   commit(code: RoomCode, matchId: MatchId, round: number, slot: PlayerSlot, commit: string): Promise<void> {
-    return set(ref(this.db, `${this.roundPath(code, matchId, round)}/${slot}/commit`), commit);
+    // Hash e horário do servidor numa única escrita: o horário conta o prazo do adversário para escolher.
+    return update(ref(this.db, `${this.roundPath(code, matchId, round)}/${slot}`), { commit, at: serverTimestamp() });
   }
 
   reveal(code: RoomCode, matchId: MatchId, round: number, slot: PlayerSlot, move: Move, nonce: string): Promise<void> {
@@ -120,6 +136,7 @@ export class FirebaseRoomGateway implements RoomGateway {
   }
 }
 
+/** Vaga recém-ocupada. As conexões entram logo em seguida, por `trackPresence`. */
 function newPresence(player: PlayerId, name: string | null) {
-  return { uid: player, name, connected: true, seenAt: serverTimestamp(), joinedAt: serverTimestamp() };
+  return { uid: player, name, seenAt: serverTimestamp(), joinedAt: serverTimestamp() };
 }

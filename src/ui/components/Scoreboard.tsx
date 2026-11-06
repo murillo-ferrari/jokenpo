@@ -44,7 +44,18 @@ export function Scoreboard({ view }: { view: PlayingView }) {
           )}
         </div>
       </div>
-      {view.winsNeeded !== null && <p class="format-line">{t.format.summary(view.bestOf, view.winsNeeded)}</p>}
+      <FormatLine view={view} />
     </section>
   );
+}
+
+/** "Melhor de 3 · vence quem fizer 2 · 10 s para escolher" (só o que se aplica à partida). */
+function FormatLine({ view }: { view: PlayingView }) {
+  const { t } = useI18n();
+  const parts = [
+    view.winsNeeded !== null ? t.format.summary(view.bestOf, view.winsNeeded) : null,
+    view.vsComputer ? null : t.choice.summary(view.choiceSeconds),
+  ].filter((part): part is string => part !== null);
+  if (parts.length === 0) return null;
+  return <p class="format-line">{parts.join(' · ')}</p>;
 }

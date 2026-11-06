@@ -4,6 +4,7 @@ import {
   SLOTS,
   opponentOf,
   winsNeeded,
+  DEFAULT_CHOICE_SECONDS,
   type BestOf,
   type MatchId,
   type Move,
@@ -20,7 +21,10 @@ import {
  */
 
 /** Prazo para revelar a jogada depois que o adversário revelou a dele. */
-export const DEFAULT_REVEAL_TIMEOUT_MS = 15_000;
+export const DEFAULT_REVEAL_TIMEOUT_MS = 5_000;
+
+/** Prazo padrão para escolher a jogada depois que o adversário escolheu a dele (a sala pode definir outro). */
+export const DEFAULT_CHOICE_TIMEOUT_MS = DEFAULT_CHOICE_SECONDS * 1000;
 
 /** Como a rodada terminou. */
 export type RoundEnding =
@@ -30,6 +34,8 @@ export type RoundEnding =
   | 'invalid-reveal'
   /** Um jogador não revelou dentro do prazo. */
   | 'reveal-timeout'
+  /** Um jogador não escolheu a jogada dentro do prazo, depois que o outro escolheu. */
+  | 'choice-timeout'
   /** Nenhum dos dois revelou algo válido: conta como empate. */
   | 'void';
 
@@ -42,7 +48,13 @@ export interface CompletedRound {
 }
 
 export type PendingRound =
-  | { index: number; phase: 'choosing'; committed: Record<PlayerSlot, boolean> }
+  | {
+      index: number;
+      phase: 'choosing';
+      committed: Record<PlayerSlot, boolean>;
+      /** Até quando o atrasado pode escolher; `null` enquanto ninguém escolheu (ou sem prazo). */
+      deadline: number | null;
+    }
   | {
       index: number;
       phase: 'revealing';
@@ -72,6 +84,8 @@ export interface EvaluateOptions {
   /** Horário atual do servidor (ms). Só influencia rodadas ainda abertas. */
   now: number;
   revealTimeoutMs?: number;
+  /** Prazo para escolher; `null` desliga (partida contra o computador). Padrão: DEFAULT_CHOICE_TIMEOUT_MS. */
+  choiceTimeoutMs?: number | null;
 }
 
 function complete(index: number, outcome: RoundOutcome, ending: RoundEnding, moves: CompletedRound['moves']): RoundEvaluation {
@@ -84,11 +98,25 @@ function complete(index: number, outcome: RoundOutcome, ending: RoundEnding, mov
  */
 export function evaluateRound(record: RoundRecord | undefined, index: number, options: EvaluateOptions): RoundEvaluation {
   const timeout = options.revealTimeoutMs ?? DEFAULT_REVEAL_TIMEOUT_MS;
+  const choiceTimeout = options.choiceTimeoutMs === undefined ? DEFAULT_CHOICE_TIMEOUT_MS : options.choiceTimeoutMs;
   const entry = (slot: PlayerSlot) => record?.[slot];
 
   const committed = { player1: Boolean(entry('player1')?.commit), player2: Boolean(entry('player2')?.commit) };
   if (!committed.player1 || !committed.player2) {
-    return { status: 'pending', round: { index, phase: 'choosing', committed } };
+    // Só um escolheu: o outro tem `choiceTimeout` para escolher, ou perde a rodada por W.O.
+    const chooser = SLOTS.find((slot) => committed[slot]);
+    const chosenAt = chooser ? entry(chooser)?.committedAt : undefined;
+    const deadline = choiceTimeout !== null && chosenAt !== undefined ? chosenAt + choiceTimeout : null;
+    if (chooser && deadline !== null && options.now > deadline) return complete(index, chooser, 'choice-timeout', {});
+    return { status: 'pending', round: { index, phase: 'choosing', committed, deadline } };
+  }
+
+  // Os dois escolheram, mas um pode ter escolhido depois do prazo: a rodada já era do outro.
+  if (choiceTimeout !== null) {
+    const p1Chose = entry('player1')?.committedAt ?? 0;
+    const p2Chose = entry('player2')?.committedAt ?? 0;
+    if (p2Chose > p1Chose + choiceTimeout) return complete(index, 'player1', 'choice-timeout', {});
+    if (p1Chose > p2Chose + choiceTimeout) return complete(index, 'player2', 'choice-timeout', {});
   }
 
   // Reveals que conferem com o commit; `false` = revelou algo inválido; `undefined` = não revelou.
@@ -164,7 +192,12 @@ export function summarize(rounds: readonly (RoundRecord | undefined)[], options:
 
     const winner = target === null ? undefined : SLOTS.find((slot) => scores[slot] >= target);
     if (winner) {
-      const next: PendingRound = { index: index + 1, phase: 'choosing', committed: { player1: false, player2: false } };
+      const next: PendingRound = {
+        index: index + 1,
+        phase: 'choosing',
+        committed: { player1: false, player2: false },
+        deadline: null,
+      };
       return { scores, ties, history, winner, current: next };
     }
   }

@@ -41,11 +41,23 @@ export function winsNeeded(bestOf: BestOf): number | null {
   return bestOf === 0 ? null : Math.ceil(bestOf / 2);
 }
 
+/** Tempo (s) para escolher a jogada depois que o adversário escolheu. Definido por quem cria a sala. */
+export const CHOICE_SECONDS_OPTIONS = [5, 10, 15] as const;
+export type ChoiceSeconds = (typeof CHOICE_SECONDS_OPTIONS)[number];
+export const DEFAULT_CHOICE_SECONDS: ChoiceSeconds = 15;
+
+export function isChoiceSeconds(value: unknown): value is ChoiceSeconds {
+  return (CHOICE_SECONDS_OPTIONS as readonly unknown[]).includes(value);
+}
+
 /** Resultado de uma rodada do ponto de vista neutro: quem venceu, ou empate. */
 export type RoundOutcome = PlayerSlot | 'tie';
 
 /** Código de sala já validado (ver `roomCode.ts`). */
 export type RoomCode = string & { readonly __brand: 'RoomCode' };
+
+/** Quantidade de caracteres de um código de sala. */
+export const ROOM_CODE_LENGTH = 4;
 
 /** Identificador de uma partida dentro da sala. Um reset aceito cria uma partida nova. */
 export type MatchId = string & { readonly __brand: 'MatchId' };
@@ -66,8 +78,9 @@ export interface Reveal {
 export interface SlotEntry {
   /** SHA-256 em hexadecimal de `commitmentPayload(move, nonce)`. */
   commit: string;
+  /** Horário do servidor (ms) em que a jogada foi escolhida. Conta o prazo do adversário para escolher. */
+  committedAt: number;
   reveal?: Reveal;
 }
 
-/** Uma rodada como está gravada: cada jogador pode ainda não ter jogado. */
 export type RoundRecord = Partial<Record<PlayerSlot, SlotEntry>>;

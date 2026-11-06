@@ -1,4 +1,4 @@
-import { SLOTS, opponentOf, type BestOf, type MatchId, type PlayerId, type PlayerSlot, type RoomCode, type RoundRecord } from './types';
+import { SLOTS, opponentOf, type BestOf, type ChoiceSeconds, type MatchId, type PlayerId, type PlayerSlot, type RoomCode, type RoundRecord } from './types';
 
 /**
  * Tempo desconectado depois do qual a vaga de um jogador pode ser liberada por outra pessoa.
@@ -27,6 +27,8 @@ export interface Room {
   createdAt: number;
   /** Formato escolhido por quem criou a sala; vale para todas as partidas dela. */
   bestOf: BestOf;
+  /** Tempo para escolher a jogada, também definido por quem criou a sala. */
+  choiceSeconds: ChoiceSeconds;
   players: Partial<Record<PlayerSlot, PlayerPresence>>;
   currentMatch: MatchId;
   /** Rodadas da partida atual, em ordem (índice = número da rodada). */

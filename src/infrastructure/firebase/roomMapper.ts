@@ -1,7 +1,9 @@
 import type { PlayerPresence, ResetRequest, Room } from '../../domain/room';
 import {
   SLOTS,
+  DEFAULT_CHOICE_SECONDS,
   isBestOf,
+  isChoiceSeconds,
   isMove,
   toPlayerId,
   type MatchId,
@@ -43,6 +45,7 @@ export function toRoom(code: RoomCode, value: unknown): Room | null {
     createdAt,
     // Salas sem formato (ou com valor desconhecido) são partida livre.
     bestOf: isBestOf(value.bestOf) ? value.bestOf : 0,
+    choiceSeconds: isChoiceSeconds(value.choiceSeconds) ? value.choiceSeconds : DEFAULT_CHOICE_SECONDS,
     players,
     currentMatch: currentMatch as MatchId,
     rounds: toRounds(match.rounds),
@@ -55,8 +58,10 @@ function toPresence(value: unknown): PlayerPresence | null {
   const uid = asString(value.uid);
   const seenAt = asNumber(value.seenAt);
   const joinedAt = asNumber(value.joinedAt);
-  if (uid === null || seenAt === null || joinedAt === null || typeof value.connected !== 'boolean') return null;
-  return { id: toPlayerId(uid), name: asString(value.name), connected: value.connected, seenAt, joinedAt };
+  if (uid === null || seenAt === null || joinedAt === null) return null;
+  // Conectado = alguma aba com conexão ativa (cada uma registra a sua em `connections`).
+  const connected = isObject(value.connections) && Object.keys(value.connections).length > 0;
+  return { id: toPlayerId(uid), name: asString(value.name), connected, seenAt, joinedAt };
 }
 
 function toResetRequest(value: unknown): ResetRequest | null {
@@ -98,8 +103,10 @@ function toRoundRecord(value: unknown): RoundRecord | undefined {
 function toSlotEntry(value: unknown): SlotEntry | null {
   if (!isObject(value)) return null;
   const commit = asString(value.commit);
-  if (commit === null) return null;
-  const entry: SlotEntry = { commit };
+  const committedAt = asNumber(value.at);
+  // As regras exigem o horário junto com o commit; sem ele, a jogada não é considerada.
+  if (commit === null || committedAt === null) return null;
+  const entry: SlotEntry = { commit, committedAt };
   const reveal = value.reveal;
   if (isObject(reveal)) {
     const nonce = asString(reveal.nonce);

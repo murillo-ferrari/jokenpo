@@ -18,7 +18,8 @@ export async function startComputerGame(
   const clock: Clock = { now: () => Date.now() };
   const server = new MemoryRoomServer(clock);
   const human = toPlayerId('human');
-  const computer = new ComputerOpponent(server, toPlayerId('computer'), cryptoRandom, options);
+  // Contra o computador não há prazo para escolher: o humano joga no próprio ritmo.
+  const computer = new ComputerOpponent(server, toPlayerId('computer'), cryptoRandom, { ...options, choiceTimeoutMs: null });
   const store = new MemorySessionStore();
   store.saveNickname(nickname);
 
@@ -29,6 +30,7 @@ export async function startComputerGame(
     random: cryptoRandom,
     store,
     vsComputer: true,
+    choiceTimeoutMs: null,
   });
   await session.start();
   await session.createRoom(bestOf);

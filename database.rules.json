@@ -6,7 +6,7 @@
       "$code": {
         ".read": "auth != null",
         ".write": "auth != null && ((!data.exists() && newData.child('players/player1/uid').val() === auth.uid) || (!newData.exists() && ((data.child('players/player1/uid').val() === auth.uid && !data.child('players/player2').exists()) || (data.child('players/player2/uid').val() === auth.uid && !data.child('players/player1').exists()) || data.child('createdAt').val() < now - 86400000)))",
-        ".validate": "$code.matches(/^[A-HJKMNP-Z2-9]{4}$/) && newData.hasChildren(['createdAt', 'currentMatch', 'bestOf'])",
+        ".validate": "$code.matches(/^[A-HJKMNP-Z2-9]{4}$/) && newData.hasChildren(['createdAt', 'currentMatch', 'bestOf', 'choiceSeconds'])",
 
         "createdAt": {
           ".validate": "newData.isNumber() && ((!data.exists() && newData.val() === now) || newData.val() === data.val())"
@@ -16,18 +16,24 @@
           ".validate": "(newData.val() === 0 || newData.val() === 3 || newData.val() === 5 || newData.val() === 7) && (!data.exists() || newData.val() === data.val())"
         },
 
+        "choiceSeconds": {
+          ".validate": "(newData.val() === 5 || newData.val() === 10 || newData.val() === 15) && (!data.exists() || newData.val() === data.val())"
+        },
+
         "players": {
           "$slot": {
-            ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || data.child('uid').val() === auth.uid || (!newData.exists() && data.child('connected').val() === false && data.child('seenAt').val() < now - 60000))",
-            ".validate": "($slot === 'player1' || $slot === 'player2') && newData.hasChildren(['uid', 'connected', 'seenAt', 'joinedAt']) && newData.parent().parent().child('createdAt').exists() && !($slot === 'player1' && newData.parent().child('player2/uid').val() === auth.uid) && !($slot === 'player2' && newData.parent().child('player1/uid').val() === auth.uid)",
+            ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || data.child('uid').val() === auth.uid || (!newData.exists() && !data.child('connections').exists() && data.child('seenAt').val() < now - 60000))",
+            ".validate": "($slot === 'player1' || $slot === 'player2') && newData.hasChildren(['uid', 'seenAt', 'joinedAt']) && newData.parent().parent().child('createdAt').exists() && !($slot === 'player1' && newData.parent().child('player2/uid').val() === auth.uid) && !($slot === 'player2' && newData.parent().child('player1/uid').val() === auth.uid)",
             "uid": {
               ".validate": "newData.val() === data.val() || (!data.exists() && newData.val() === auth.uid)"
             },
             "name": {
               ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"
             },
-            "connected": {
-              ".validate": "newData.isBoolean()"
+            "connections": {
+              "$connectionId": {
+                ".validate": "newData.val() === true && $connectionId.matches(/^[A-Za-z0-9_-]{1,40}$/)"
+              }
             },
             "seenAt": {
               ".validate": "newData.isNumber() && newData.val() <= now"
@@ -59,7 +65,11 @@
               "$round": {
                 ".validate": "$round.matches(/^[0-9]{1,4}$/)",
                 "$slot": {
-                  ".validate": "$slot === 'player1' || $slot === 'player2'",
+                  ".validate": "($slot === 'player1' || $slot === 'player2') && newData.hasChildren(['commit', 'at'])",
+                  "at": {
+                    ".write": "auth != null && !data.exists() && root.child('rooms/' + $code + '/players/' + $slot + '/uid').val() === auth.uid && root.child('rooms/' + $code + '/currentMatch').val() === $matchId",
+                    ".validate": "newData.isNumber() && newData.val() === now"
+                  },
                   "commit": {
                     ".write": "auth != null && !data.exists() && root.child('rooms/' + $code + '/players/' + $slot + '/uid').val() === auth.uid && root.child('rooms/' + $code + '/currentMatch').val() === $matchId",
                     ".validate": "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)"

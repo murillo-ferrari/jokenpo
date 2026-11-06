@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayingView } from '../src/application/view';
-import { DEFAULT_REVEAL_TIMEOUT_MS } from '../src/domain/match';
+import { DEFAULT_CHOICE_TIMEOUT_MS, DEFAULT_REVEAL_TIMEOUT_MS } from '../src/domain/match';
 import { STALE_PLAYER_MS } from '../src/domain/room';
 import type { BestOf, Move, RoomCode } from '../src/domain/types';
 import { GameSession } from '../src/application/gameSession';
@@ -204,8 +204,7 @@ describe('W.O. e desconexão', () => {
   it('quem não revela no prazo perde a rodada', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const { alice, bob, code } = await startGame();
-    // Bob grava o commit e fecha a aba antes de revelar (sem sessão ativa para revelar sozinha).
-    bob.session.dispose();
+    // Bob grava um commit sem guardar a jogada no navegador: continua conectado, mas não consegue revelar.
     const matchId = server.snapshot(code)?.currentMatch;
     if (!matchId) throw new Error('sala sumiu');
     await bob.gateway.commit(code, matchId, 0, 'player2', 'b'.repeat(64));
@@ -220,6 +219,40 @@ describe('W.O. e desconexão', () => {
       scores: { me: 1, opponent: 0 },
       lastRound: { result: 'win', ending: 'reveal-timeout', opponentMove: null },
     });
+  });
+
+  it('quem não escolhe no prazo depois do adversário perde a rodada', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const { alice, bob } = await startGame();
+    await alice.session.play('rock');
+    await settle();
+    expect(playing(bob)).toMatchObject({ opponentHasChosen: true, choiceDeadline: server.time + DEFAULT_CHOICE_TIMEOUT_MS });
+    expect(playing(alice).choiceDeadline).toBe(server.time + DEFAULT_CHOICE_TIMEOUT_MS);
+
+    server.time += DEFAULT_CHOICE_TIMEOUT_MS + 1;
+    vi.advanceTimersByTime(DEFAULT_CHOICE_TIMEOUT_MS + 100);
+    await settle();
+    expect(playing(alice)).toMatchObject({
+      roundNumber: 2,
+      scores: { me: 1, opponent: 0 },
+      choiceDeadline: null,
+      lastRound: { result: 'win', ending: 'choice-timeout', myMove: null, opponentMove: null },
+    });
+    expect(playing(bob)).toMatchObject({ scores: { me: 0, opponent: 1 }, lastRound: { result: 'loss', ending: 'choice-timeout' } });
+  });
+
+  it('o prazo para escolher é o definido na sala', async () => {
+    const alice = createPlayer(server, 'alice');
+    const bob = createPlayer(server, 'bob');
+    await alice.session.start();
+    await alice.session.createRoom(0, 5);
+    await settle();
+    await bob.session.start();
+    await bob.session.joinRoom(codeOf(alice));
+    await settle();
+    await alice.session.play('rock');
+    await settle();
+    expect(playing(bob)).toMatchObject({ choiceSeconds: 5, choiceDeadline: server.time + 5_000 });
   });
 
   it('adversário desconectado aparece como tal e não dá para jogar', async () => {
@@ -242,6 +275,38 @@ describe('W.O. e desconexão', () => {
     await settle();
     expect(alice.view()).toEqual({ screen: 'waiting', code, bestOf: 0 });
     expect(alice.notices).toContain('opponent-left');
+  });
+
+  it('com duas abas do mesmo jogador, fechar uma não o desconecta', async () => {
+    const { alice, bob } = await startGame();
+    const secondTab = createPlayer(server, 'bob', { store: bob.store });
+    await secondTab.session.start();
+    await settle();
+    expect(secondTab.view().screen).toBe('playing');
+
+    bob.session.dispose(); // fecha a primeira aba
+    await settle();
+    expect(playing(alice).opponent).toBe('connected');
+
+    secondTab.session.dispose(); // fecha a última
+    await settle();
+    expect(playing(alice).opponent).toBe('disconnected');
+  });
+
+  it('com duas abas, a queda de uma conexão não derruba a outra', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const { alice, bob, code } = await startGame();
+    const secondTab = createPlayer(server, 'bob', { store: bob.store });
+    await secondTab.session.start();
+    await settle();
+
+    bob.session.dispose();
+    await settle();
+    server.time += STALE_PLAYER_MS + 1;
+    vi.advanceTimersByTime(STALE_PLAYER_MS + 100);
+    await settle();
+    // Passou o prazo de vaga abandonada, mas o Bob segue na sala pela outra aba.
+    expect(alice.view()).toMatchObject({ screen: 'playing', opponent: 'connected', code });
   });
 
   it('reconectar a tempo mantém a vaga', async () => {
@@ -393,6 +458,22 @@ describe('melhor de N e revanche', () => {
     await settle();
     expect(playing(alice)).toMatchObject({ phase: 'choosing', bestOf: 3, roundNumber: 1, scores: { me: 0, opponent: 0 } });
     expect(playing(bob)).toMatchObject({ phase: 'choosing', canPlay: true });
+  });
+
+  it('clicar em revanche de novo, com o pedido já feito, não faz nada', async () => {
+    const { alice, bob, code } = await startGame(3);
+    await round(alice, bob, 'rock', 'scissors');
+    await round(alice, bob, 'rock', 'scissors');
+
+    await bob.session.rematch();
+    await settle();
+    const request = server.snapshot(code)?.resetRequest;
+    server.time += 1000;
+    await bob.session.rematch(); // segundo clique
+    await settle();
+
+    expect(server.snapshot(code)?.resetRequest).toEqual(request); // mesmo pedido, não renovado
+    expect(playing(bob)).toMatchObject({ phase: 'finished', reset: 'requested-by-me' });
   });
 
   it('a sala de espera mostra o formato', async () => {

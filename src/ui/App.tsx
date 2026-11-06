@@ -3,12 +3,14 @@ import type { GameSession } from '../application/gameSession';
 import type { Notice } from '../application/view';
 import type { BestOf } from '../domain/types';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
+import { SoundToggle } from './components/SoundToggle';
 import { ToastProvider, useToast } from './components/Toasts';
 import { useGameView, useNotices } from './hooks/useGameSession';
 import { I18nProvider, useI18n, type Language } from './i18n';
 import { GameScreen } from './screens/GameScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { WaitingScreen } from './screens/WaitingScreen';
+import { SoundProvider } from './sound';
 
 /** Partida contra o computador: uma sessão própria, sem rede, descartada ao sair. */
 export interface ComputerGame {
@@ -25,9 +27,11 @@ interface AppProps {
 export function App({ session, language, startComputerGame }: AppProps) {
   return (
     <I18nProvider initial={language}>
-      <ToastProvider>
-        <Shell onlineSession={session} startComputerGame={startComputerGame} />
-      </ToastProvider>
+      <SoundProvider>
+        <ToastProvider>
+          <Shell onlineSession={session} startComputerGame={startComputerGame} />
+        </ToastProvider>
+      </SoundProvider>
     </I18nProvider>
   );
 }
@@ -83,7 +87,10 @@ function Layout({ session, vsComputer, onPlayComputer }: { session: GameSession;
         <h1>
           <span aria-hidden="true">✊✋✌️</span> {t.appTitle}
         </h1>
-        <LanguageSwitcher />
+        <div class="header-controls">
+          <SoundToggle />
+          <LanguageSwitcher />
+        </div>
       </header>
       <main class="card">
         {view.screen === 'loading' && (

@@ -1,11 +1,12 @@
-import type { RandomSource, RoomCode } from './types';
+import { ROOM_CODE_LENGTH, type RandomSource, type RoomCode } from './types';
+
+export { ROOM_CODE_LENGTH };
 
 /**
  * Sem 0/O, 1/I/L: caracteres fáceis de confundir ao ditar ou digitar o código.
  * Deve bater com a regex de `$code` em database.rules.json.
  */
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-export const ROOM_CODE_LENGTH = 4;
 
 export type RoomCodeError = 'empty' | 'length' | 'characters';
 

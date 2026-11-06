@@ -24,13 +24,20 @@ export function ConfirmDialog({ open, title, body, confirmLabel, cancelLabel, to
   // Layout effect: o modal abre/fecha no mesmo quadro da renderização, sem piscar.
   useLayoutEffect(() => {
     const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) {
-      if (typeof dialog.showModal === 'function') dialog.showModal();
-      else dialog.setAttribute('open', '');
-    } else if (!open && dialog.open) {
+    // Sem elemento, ou já no estado pedido (aberto/fechado): nada a fazer.
+    if (!dialog || dialog.open === open) return;
+
+    if (!open) {
       dialog.close();
+      return;
     }
+
+    // Navegador sem `showModal` (antigo): abre sem o comportamento de modal.
+    if (typeof dialog.showModal !== 'function') {
+      dialog.setAttribute('open', '');
+      return;
+    }
+    dialog.showModal();
   }, [open]);
 
   return (

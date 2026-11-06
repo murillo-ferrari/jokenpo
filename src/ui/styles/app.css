@@ -179,6 +179,29 @@ p {
   color: var(--text);
 }
 
+/* ---------- Cabeçalho: som e idioma ---------- */
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.icon-toggle {
+  min-width: 44px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.icon-toggle[aria-pressed='false'] {
+  opacity: 0.7;
+}
+
 /* ---------- Idioma ---------- */
 
 .language-switcher {
@@ -309,6 +332,14 @@ p {
   border: 1px solid var(--border);
   border-radius: var(--radius-small);
   overflow: hidden;
+}
+
+.segmented-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.format-picker .hint {
+  margin-top: var(--space-1);
 }
 
 .segment {
@@ -446,9 +477,12 @@ p {
 }
 
 .score-middle {
+  /* Largura fixa: "Rodada 12" e "Fim de partida" não deslocam os placares. */
+  min-width: 8.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
+  text-align: center;
   font-size: 0.875rem;
   color: var(--text-muted);
 }
@@ -574,9 +608,48 @@ p {
 }
 
 .round-vs {
-  min-width: 5ch;
+  /* Largura fixa: "Jo…", "Pô!", "vs" e "Scissors!" ocupam o mesmo espaço, sem empurrar os emojis. */
+  width: 10ch;
+  text-align: center;
   font-weight: 800;
   color: var(--text-muted);
+}
+
+/* "?" antes da primeira rodada: cor do tema (contraste garantido nos dois modos), mesmo tamanho do emoji. */
+.round-move-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  height: 1.2em;
+  border: 3px dashed var(--border);
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 0.6em;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+/* Adversário (ou eu, em outro aparelho) já escolheu: borda contínua, sem revelar a jogada. */
+.round-move-placeholder.is-chosen {
+  border-style: solid;
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+/* Uma linha reservada para o resultado, mesmo quando vazio (antes da rodada e durante a contagem). */
+.round-outcome {
+  min-height: calc(1.375rem * 1.5);
+}
+
+.round-move-emoji.shaking {
+  animation: shake 0.35s ease-in-out infinite;
+}
+
+@keyframes shake {
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 .round-result {
@@ -599,15 +672,59 @@ p {
   color: var(--tie);
 }
 
-.round-ending {
+.round-ending-tag {
+  margin-left: var(--space-2);
   font-size: 0.875rem;
+  font-weight: 600;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .status {
+  /* Duas linhas reservadas: textos longos quebram sem empurrar os botões. */
+  min-height: 3em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-weight: 600;
-  min-height: 1.5em;
+}
+
+/* Status + jogadas, ou o painel de fim de partida: mesma altura mínima nos dois casos. */
+.play-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 11.5rem;
+}
+
+.play-area > .match-over {
+  flex: 1;
+  justify-content: center;
+}
+
+.status {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.countdown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.5ch;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown-urgent {
+  border-color: var(--loss);
+  color: var(--loss);
 }
 
 .status-warning {
@@ -664,6 +781,7 @@ p {
 }
 
 .reset-pending {
+  flex: 1 1 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -676,6 +794,12 @@ p {
   font-size: 0.9375rem;
 }
 
+.history {
+  /* Altura de cada rodada e quantas aparecem antes da rolagem. */
+  --history-row: 2.25rem;
+  --history-visible: 5;
+}
+
 .history summary {
   cursor: pointer;
   color: var(--text-muted);
@@ -683,6 +807,29 @@ p {
   min-height: 44px;
   display: flex;
   align-items: center;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+/* O `display: flex` esconde o triângulo nativo; a seta abaixo o substitui (e some no Safari também). */
+.history summary::-webkit-details-marker {
+  display: none;
+}
+
+.history summary::after {
+  content: '';
+  width: 0.5em;
+  height: 0.5em;
+  margin-top: -0.2em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg); /* aponta para baixo: fechado */
+  transition: transform 0.15s ease;
+}
+
+.history[open] summary::after {
+  margin-top: 0.2em;
+  transform: rotate(-135deg); /* aponta para cima: aberto */
 }
 
 .history ol {
@@ -692,6 +839,10 @@ p {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  /* No máximo 5 rodadas à vista; as demais com rolagem dentro da lista. */
+  max-height: calc(var(--history-row) * var(--history-visible) + var(--space-1) * (var(--history-visible) - 1));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .history li {
@@ -699,9 +850,18 @@ p {
   grid-template-columns: 2.5ch 1fr auto;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-1) var(--space-2);
+  /* Altura fixa: com emojis, a linha não fica mais alta e o limite de 5 continua exato. */
+  flex: 0 0 var(--history-row);
+  height: var(--history-row);
+  padding: 0 var(--space-2);
   border-radius: var(--radius-small);
   background: var(--surface-muted);
+}
+
+.history-empty {
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.9375rem;
 }
 
 .history-number {

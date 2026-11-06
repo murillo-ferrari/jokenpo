@@ -1,7 +1,7 @@
 import { summarize, type MatchSummary } from '../domain/match';
 import { normalizeNickname } from '../domain/nickname';
 import { STALE_PLAYER_MS, isAlone, opponentStatus, slotOf, type Room } from '../domain/room';
-import { opponentOf, type BestOf, type Move, type PlayerId, type PlayerSlot, type RoomCode } from '../domain/types';
+import { DEFAULT_CHOICE_SECONDS, opponentOf, type BestOf, type ChoiceSeconds, type Move, type PlayerId, type PlayerSlot, type RoomCode } from '../domain/types';
 import { createRoom } from './createRoom';
 import { joinRoom } from './joinRoom';
 import { leaveRoom } from './leaveRoom';
@@ -18,6 +18,11 @@ export interface GameSessionDeps {
   store: SessionStore;
   /** Partida contra o computador: só muda o que a tela mostra. */
   vsComputer?: boolean;
+  /**
+   * Prazo para escolher a jogada. Sem valor: o tempo definido na sala. `null` desliga
+   * (contra o computador). Um número substitui o da sala (testes).
+   */
+  choiceTimeoutMs?: number | null;
 }
 
 type Listener<T> = (value: T) => void;
@@ -65,6 +70,11 @@ export class GameSession {
     return this.view;
   }
 
+  /** Horário do servidor, para a tela mostrar a contagem dos prazos. */
+  serverNow(): number {
+    return this.deps.clock.now();
+  }
+
   subscribe(listener: Listener<GameView>): Unsubscribe {
     this.viewListeners.add(listener);
     return () => this.viewListeners.delete(listener);
@@ -90,17 +100,28 @@ export class GameSession {
       this.goHome('unexpected');
       return;
     }
+
+    // Convite tem prioridade: erros aparecem, porque a pessoa acabou de abrir o link.
+    if (inviteCode) {
+      await this.enter(inviteCode, { showErrors: true });
+      return;
+    }
+
+    // Volta à sala de antes do F5; se ela não existe mais, cai na tela inicial sem alarde.
     const saved = this.deps.store.loadRoom();
-    if (inviteCode) await this.enter(inviteCode, { showErrors: true });
-    else if (saved) await this.enter(saved, { showErrors: false });
-    else this.goHome(null);
+    if (saved) {
+      await this.enter(saved, { showErrors: false });
+      return;
+    }
+
+    this.goHome(null);
   }
 
-  async createRoom(bestOf: BestOf = 0): Promise<void> {
+  async createRoom(bestOf: BestOf = 0, choiceSeconds: ChoiceSeconds = DEFAULT_CHOICE_SECONDS): Promise<void> {
     this.setHome(true, null);
     try {
       const player = await this.ensurePlayer();
-      const code = await createRoom(this.deps, player, { hostName: this.deps.store.loadNickname(), bestOf });
+      const code = await createRoom(this.deps, player, { hostName: this.deps.store.loadNickname(), bestOf, choiceSeconds });
       this.attach(code);
     } catch {
       this.goHome('unexpected');
@@ -139,8 +160,18 @@ export class GameSession {
   /** Revanche depois de uma partida decidida: aceita o pedido do adversário, ou faz o pedido. */
   async rematch(): Promise<void> {
     const request = this.room?.resetRequest;
-    if (request && request.by !== this.player) await this.respondToReset(true);
-    else if (!request) await this.requestReset();
+
+    // Ninguém pediu ainda: eu peço.
+    if (!request) {
+      await this.requestReset();
+      return;
+    }
+
+    // O pedido já é meu: só resta esperar a resposta.
+    if (request.by === this.player) return;
+
+    // O adversário pediu: clicar em "Revanche" também é aceitar.
+    await this.respondToReset(true);
   }
 
   async requestReset(): Promise<void> {
@@ -257,18 +288,36 @@ export class GameSession {
   }
 
   private announceChanges(previous: Room, room: Room, slot: PlayerSlot): void {
+    this.announceOpponentChange(previous, room, slot);
+    this.announceResetOutcome(previous, room);
+  }
+
+  /** Avisa quando o adversário entra (ou é trocado por outro) e quando sai. */
+  private announceOpponentChange(previous: Room, room: Room, slot: PlayerSlot): void {
     const opponent = opponentOf(slot);
     const before = previous.players[opponent]?.id;
     const after = room.players[opponent]?.id;
-    if (after && after !== before) this.notify('opponent-joined');
-    else if (before && !after) this.notify('opponent-left');
 
-    const me = this.requirePlayer();
-    if (previous.resetRequest?.by === me && !room.resetRequest) {
-      if (room.currentMatch !== previous.currentMatch) this.notify('reset-accepted');
-      else if (!this.cancelledMyReset) this.notify('reset-declined');
-      this.cancelledMyReset = false;
+    if (after && after !== before) {
+      this.notify('opponent-joined');
+      return;
     }
+    if (before && !after) this.notify('opponent-left');
+  }
+
+  /** Quando o MEU pedido de reset some: aceito (partida nova), recusado, ou cancelado por mim (sem aviso). */
+  private announceResetOutcome(previous: Room, room: Room): void {
+    const myRequestWasAnswered = previous.resetRequest?.by === this.requirePlayer() && !room.resetRequest;
+    if (!myRequestWasAnswered) return;
+
+    const cancelledByMe = this.cancelledMyReset;
+    this.cancelledMyReset = false;
+
+    if (room.currentMatch !== previous.currentMatch) {
+      this.notify('reset-accepted');
+      return;
+    }
+    if (!cancelledByMe) this.notify('reset-declined');
   }
 
   /** Escritas automáticas, disparadas pelo estado da sala (e pelo relógio). */
@@ -359,9 +408,8 @@ export class GameSession {
 
     const now = this.deps.clock.now();
     const deadlines: number[] = [];
-    if (summary.current.phase === 'revealing' && summary.current.deadline !== null) {
-      deadlines.push(summary.current.deadline);
-    }
+    // Fim do prazo para revelar ou para escolher: reavalia para aplicar o W.O.
+    if (summary.current.deadline !== null) deadlines.push(summary.current.deadline);
     const opponent = room.players[opponentOf(slot)];
     if (opponent && !opponent.connected) deadlines.push(opponent.seenAt + STALE_PLAYER_MS);
 
@@ -377,7 +425,11 @@ export class GameSession {
   // ---- Auxiliares ---------------------------------------------------------
 
   private summary(room: Room): MatchSummary {
-    return summarize(room.rounds, { now: this.deps.clock.now(), bestOf: room.bestOf });
+    return summarize(room.rounds, {
+      now: this.deps.clock.now(),
+      bestOf: room.bestOf,
+      choiceTimeoutMs: this.deps.choiceTimeoutMs === undefined ? room.choiceSeconds * 1000 : this.deps.choiceTimeoutMs,
+    });
   }
 
   private currentRoundContext(): RoundContext | null {

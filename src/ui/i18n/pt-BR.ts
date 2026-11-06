@@ -6,6 +6,7 @@ export const ptBR: Messages = {
   loading: 'Carregando…',
   configError: 'Não foi possível iniciar o jogo. Tente recarregar a página.',
   language: { label: 'Idioma' },
+  sound: { label: 'Sons do jogo' },
 
   moves: { rock: 'Pedra', paper: 'Papel', scissors: 'Tesoura' },
 
@@ -13,6 +14,13 @@ export const ptBR: Messages = {
     label: 'Formato da partida',
     options: { 0: 'Livre', 3: 'Melhor de 3', 5: 'Melhor de 5', 7: 'Melhor de 7' },
     summary: (bestOf, wins) => `Melhor de ${bestOf} · vence quem fizer ${wins}`,
+  },
+
+  choice: {
+    label: 'Tempo para escolher',
+    hint: 'Conta depois que o adversário escolhe. Não vale contra o computador.',
+    option: (seconds) => `${seconds} s`,
+    summary: (seconds) => `${seconds} s para escolher`,
   },
 
   home: {
@@ -64,6 +72,8 @@ export const ptBR: Messages = {
     ties: 'Empates',
     scoreSummary: (me, opponent, ties) => `Placar: você ${me}, adversário ${opponent}, ${ties} empates.`,
     movesLabel: 'Sua jogada',
+    nextRound: 'Escolha sua jogada para a próxima rodada.',
+    noRoundsYet: 'Nenhuma rodada ainda.',
     chooseMove: 'Escolha sua jogada.',
     youChose: (move) => `Você escolheu ${move}.`,
     waitingOpponent: 'Esperando o adversário escolher…',
@@ -77,12 +87,19 @@ export const ptBR: Messages = {
         win: 'O adversário não revelou a jogada a tempo.',
         loss: 'Sua jogada não foi revelada a tempo.',
       },
+      'choice-timeout': {
+        win: 'O adversário não escolheu a jogada a tempo.',
+        loss: 'Você não escolheu a jogada a tempo.',
+      },
       'invalid-reveal': {
         win: 'A jogada revelada pelo adversário não conferia com a escolhida.',
         loss: 'Sua jogada revelada não conferia com a escolhida.',
       },
       void: 'Rodada anulada.',
     },
+    endingTags: { 'reveal-timeout': 'por W.O.', 'choice-timeout': 'por W.O.', 'invalid-reveal': 'jogada inválida', void: 'anulada' },
+    secondsLeft: (seconds) => `${seconds} s`,
+    choiceDeadlineNotice: (seconds) => `Você tem ${seconds} segundos para escolher.`,
     noMove: 'não revelou',
     roundSummary: (n, me, opponent, result) => `Rodada ${n}: você ${me}, adversário ${opponent}. ${result}`,
     history: (count) => `Rodadas anteriores (${count})`,

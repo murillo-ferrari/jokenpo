@@ -8,6 +8,8 @@ import { MemoryRoomGateway, type MemoryRoomServer } from './memoryRooms';
 export interface ComputerOpponentOptions {
   /** Tempo "pensando" antes de escolher, em ms: [mínimo, máximo]. */
   thinkingMs?: readonly [number, number];
+  /** Prazo para escolher usado na partida; precisa ser o mesmo da sessão do humano. */
+  choiceTimeoutMs?: number | null;
 }
 
 const DEFAULT_THINKING_MS = [500, 1200] as const;
@@ -59,21 +61,31 @@ export class ComputerOpponent {
     }
 
     if (!room.players[opponentOf(mySlot)]) return;
-    const summary = summarize(room.rounds, { now: this.server.clock.now(), bestOf: room.bestOf });
+    const summary = summarize(room.rounds, {
+      now: this.server.clock.now(),
+      bestOf: room.bestOf,
+      choiceTimeoutMs: this.options.choiceTimeoutMs,
+    });
     if (summary.winner) return;
 
     const { current } = summary;
     const key = `${room.currentMatch}/${current.index}`;
-    if (current.phase === 'choosing' && !current.committed[mySlot]) {
-      this.once(`commit:${key}`, () => this.commitAfterThinking(room, mySlot, current.index, key));
-    } else if (current.phase === 'revealing' && !current.revealed[mySlot]) {
-      const secret = this.secrets.get(key);
-      if (secret) {
-        this.once(`reveal:${key}`, () =>
-          this.gateway.reveal(code, room.currentMatch, current.index, mySlot, secret.move, secret.nonce),
-        );
+
+    // Hora de escolher: escolhe (depois de "pensar"), se ainda não escolheu.
+    if (current.phase === 'choosing') {
+      if (!current.committed[mySlot]) {
+        this.once(`commit:${key}`, () => this.commitAfterThinking(room, mySlot, current.index, key));
       }
+      return;
     }
+
+    // Hora de revelar: revela a jogada guardada, se ainda não revelou.
+    if (current.revealed[mySlot]) return;
+    const secret = this.secrets.get(key);
+    if (!secret) return;
+    this.once(`reveal:${key}`, () =>
+      this.gateway.reveal(code, room.currentMatch, current.index, mySlot, secret.move, secret.nonce),
+    );
   }
 
   private join(room: Room): void {

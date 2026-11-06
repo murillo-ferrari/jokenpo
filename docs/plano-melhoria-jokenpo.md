@@ -158,13 +158,15 @@ O modelo atual guarda `scores`, `round`, `move` e `resultProcessed`, e cada camp
 ```
 rooms/{code}
   createdAt
+  bestOf: 0 | 3 | 5 | 7             # formato da partida
+  choiceSeconds: 5 | 10 | 15        # tempo para escolher
   players/
-    player1: { uid, connected, seenAt, joinedAt }
-    player2: { uid, connected, seenAt, joinedAt }
+    player1: { uid, name?, seenAt, joinedAt, connections?: { [id]: true } }   # uma conexão por aba
+    player2: { uid, name?, seenAt, joinedAt, connections?: { [id]: true } }
   matches/{matchId}                 # reset = nova partida; histórico preservado
     rounds/{n}/
-      player1: { commit, reveal?: { move, nonce, at } }
-      player2: { commit, reveal?: { move, nonce, at } }
+      player1: { commit, at, reveal?: { move, nonce, at } }
+      player2: { commit, at, reveal?: { move, nonce, at } }
   currentMatch: matchId
   resetRequest?: { by, at }
 ```
@@ -192,9 +194,9 @@ rooms/{code}
 
 **Presença (B9, B10):**
 
-- `onDisconnect()` grava `connected: false` e `seenAt` no servidor quando a conexão cai, sem depender de `unload`.
+- Cada aba registra a própria conexão em `players/{vaga}/connections/{id}`. O jogador está conectado enquanto houver alguma conexão. Quando uma aba cai, o `onDisconnect()` remove só aquela conexão e atualiza `seenAt` no servidor, sem depender de `unload`.
 - O `uid` anônimo persiste no navegador, então atualizar a página reconecta ao mesmo slot.
-- O adversário vê "Oponente desconectado…". Depois de 60 s desconectado, qualquer pessoa pode liberar o slot, e isso é garantido pelas regras.
+- O adversário vê "Oponente desconectado…". Depois de 60 s **sem nenhuma conexão**, qualquer pessoa pode liberar o slot, e isso é garantido pelas regras.
 - Salas antigas: sem Functions não há limpeza agendada, mas as regras podem permitir que qualquer cliente apague salas com `createdAt` de mais de 24 h, e a criação de uma nova sala faz essa faxina oportunista.
 
 ---
@@ -331,6 +333,71 @@ A antiga Fase 0, uma correção emergencial no código atual, foi descartada: a 
   - service worker ativo, com os arquivos do build no cache já na primeira visita.
 
   A reabertura totalmente offline não foi vista na tela, porque a extensão do navegador desconectou nesse momento.
+
+#### Correções após teste manual (06/11/2026)
+
+- **Placar antes da revelação.** O placar, o número da rodada e o painel de fim de partida mudavam antes de a contagem "Jo… Ken… Pô!" terminar.
+  - O hook `useRevealSequence` congela a tela no estado anterior durante a contagem e atualiza tudo junto com as jogadas.
+  - Durante a contagem, os botões ficam travados.
+  - Com `prefers-reduced-motion`, o resultado aparece na hora.
+  - Há um teste de regressão para cada caso.
+- **CLS (componentes se mexendo).** Espaço reservado para tudo que muda de conteúdo:
+  - cartão da rodada sempre visível, inclusive vazio antes da primeira rodada;
+  - resultado e explicação de W.O. com altura fixa;
+  - palavra da contagem e meio do placar com largura fixa;
+  - status com duas linhas reservadas;
+  - área de jogada com altura mínima comum ao painel de fim de partida;
+  - aviso de reset pendente no rodapé.
+
+  Medido no Chrome com `layout-shift`: CLS de **0,0032** em 5 rodadas. O limite de "bom" é 0,1.
+- **Cartão da rodada atual** (pedido após teste). O cartão do centro deixou de mostrar a rodada passada enquanto se escolhe a próxima. Agora ele segue o ciclo:
+  - "?" dos dois lados;
+  - a sua jogada do seu lado, e "✓" do lado do adversário quando ele escolhe, sem revelar qual;
+  - a contagem;
+  - o resultado por 2,5 s (ou até você escolher a próxima jogada);
+  - a rodada seguinte.
+
+  Com a partida decidida, o resultado final fica no cartão. As rodadas concluídas ficam no histórico, que está sempre na tela. Enquanto o resultado está no cartão, o status diz "Escolha sua jogada para a próxima rodada." em vez de anunciar o adversário. CLS medido novamente: **0,0022** em 4 rodadas.
+- **Prazo para escolher** (pedido após teste com dois navegadores). Antes, só existia prazo para *revelar*, que na prática só pesava se a aba fechasse no meio. Agora:
+  - quando um jogador escolhe, o outro tem o tempo definido na sala; se o prazo passar, perde a rodada por W.O. (`choice-timeout`);
+  - **quem cria a sala escolhe 5, 10 ou 15 s** (padrão 15; lembrado no navegador):
+    - `choiceSeconds` fica na sala, validado e imutável pelas regras;
+    - aparece na linha do placar ("10 s para escolher");
+  - o commit grava `at`, o horário do servidor, e as regras exigem que ele seja o horário real;
+  - o resultado depende só dos dados gravados: escolher depois do prazo não muda o W.O.;
+  - na tela, uma contagem ⏱ aparece ao lado do status para os dois jogadores e fica vermelha nos últimos 5 s; o leitor de tela recebe o prazo uma vez;
+  - contra o computador o prazo fica desligado (`choiceTimeoutMs: null`);
+  - **alerta sonoro** nos últimos 5 s:
+    - a reta final é metade do prazo, no máximo 5 s (5 s → 3; 10 e 15 s → 5);
+    - um bipe por segundo, gerado com Web Audio, sem arquivo e funcionando offline; os 2 últimos são mais agudos;
+    - toca só para quem ainda precisa escolher;
+    - botão 🔊/🔇 no cabeçalho, salvo no navegador;
+    - o áudio é destravado no primeiro toque, exigência do iOS;
+  - num W.O. por não escolher, o resultado aparece direto, sem a contagem "Jo… Ken… Pô!", porque não há o que revelar; o cartão mostra "✓" de quem escolheu, sem revelar a jogada, e "—" de quem não escolheu;
+  - testes: 6 de domínio, 1 de sessão, 1 do computador, 2 de interface e 1 de regras no emulador.
+- **Explicação de W.O. numa linha só.** A explicação de rodadas fora do normal ocupava duas linhas reservadas em toda rodada, o que deixava espaço vazio quase sempre. Virou uma etiqueta curta na própria linha do resultado ("Você venceu! · por W.O.", "jogada inválida", "anulada"); a explicação completa fica no tooltip e no texto do leitor de tela. A altura do cartão continua fixa, agora com uma linha só.
+- **Campo do código da sala**: no máximo 4 caracteres. Enquanto se digita, o texto vira maiúsculas e perde espaços e hífens, então colar "ab-23" dá "AB23". Não usa `maxLength`, que cortaria o texto colado antes da limpeza. O tamanho vem de `ROOM_CODE_LENGTH`, em `domain/types.ts`.
+- **Histórico das rodadas**: no máximo 5 à vista, com rolagem dentro da lista e linhas de altura fixa. Seta que aponta para baixo (fechado) e para cima (aberto); o `display: flex` do `<summary>` tinha escondido o triângulo nativo.
+- **"?" invisível no tema claro**: o emoji ❔ é branco. Foi trocado por um "?" desenhado com a cor de texto do tema, e por um "✓" para quem já escolheu.
+- **Offline não abria.** O service worker ignorava o JS e o CSS por causa do cabeçalho `Vary: Origin` combinado com o atributo `crossorigin`. Corrigido com `ignoreVary` e o cache renomeado para `jokenpo-v2`. Verificado com o servidor desligado: a página abre e a partida contra o computador funciona.
+
+Estado dos testes após essas correções: 189 unitários e 46 no emulador, todos passando (192 e 50 depois da correção de presença abaixo).
+
+#### Pendência encontrada em teste (resolvida)
+
+- [x] **Presença com várias abas do mesmo jogador.**
+  - **Problema:** fechar uma das abas marcava o jogador como desconectado, mesmo com outra aba aberta, porque a presença era um único campo `connected`. Com isso, o adversário via "desconectado" e, depois de 60 s, podia liberar a vaga de quem continuava jogando.
+  - **Correção:**
+    - cada aba registra a própria conexão em `players/{vaga}/connections/{id}`, com um `onDisconnect` que remove só aquela conexão e atualiza `seenAt`;
+    - o domínio continua recebendo `connected`, agora calculado pelo mapper ("alguma conexão ativa"), então as regras do jogo não mudaram;
+    - as regras do banco deixam só o dono mexer nas próprias conexões, aceitam só `true` com id simples e só permitem liberar a vaga se não houver nenhuma conexão e o último sinal tiver mais de 60 s;
+    - o servidor em memória (modo contra o computador e testes) segue o mesmo modelo.
+  - **Testes:**
+    - duas abas, fechar uma mantém o jogador conectado, e fechar as duas o desconecta;
+    - com duas abas, passar do prazo de 60 s não libera a vaga;
+    - regras do banco: conexões do outro, valor e id inválidos, vaga com conexão ativa nunca liberada;
+    - no emulador, fechar uma aba remove só a conexão dela, e a queda de rede (`goOffline`) faz o servidor remover a conexão sozinho.
+  - Resultado: 192 testes unitários e 50 no emulador.
 
 ### Fase 6: documentação
 
