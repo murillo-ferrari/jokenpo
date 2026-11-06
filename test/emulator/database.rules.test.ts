@@ -108,10 +108,24 @@ describe('criar e apagar sala', () => {
     await assertFails(db('alice').ref(ROOM).set({ ...newRoom('alice'), scores: { player1: 99 } }));
   });
 
-  it('só player1 apaga a sala', async () => {
+  it('com os dois na sala, ninguém apaga a sala', async () => {
     await seedFullRoom();
+    await assertFails(db('alice').ref(ROOM).remove());
     await assertFails(db('bob').ref(ROOM).remove());
+  });
+
+  it('o último jogador na sala a apaga, seja player1 ou player2', async () => {
+    await seed(ROOM, newRoomSeed('alice'));
+    await assertFails(db('carol').ref(ROOM).remove());
     await assertSucceeds(db('alice').ref(ROOM).remove());
+
+    const now = Date.now();
+    await seed(ROOM, {
+      createdAt: now,
+      currentMatch: MATCH,
+      players: { player2: { uid: 'bob', connected: true, seenAt: now, joinedAt: now } },
+    });
+    await assertSucceeds(db('bob').ref(ROOM).remove());
   });
 
   it('qualquer um apaga sala com mais de 24 h', async () => {

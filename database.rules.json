@@ -5,7 +5,7 @@
     "rooms": {
       "$code": {
         ".read": "auth != null",
-        ".write": "auth != null && ((!data.exists() && newData.child('players/player1/uid').val() === auth.uid) || (!newData.exists() && (data.child('players/player1/uid').val() === auth.uid || data.child('createdAt').val() < now - 86400000)))",
+        ".write": "auth != null && ((!data.exists() && newData.child('players/player1/uid').val() === auth.uid) || (!newData.exists() && ((data.child('players/player1/uid').val() === auth.uid && !data.child('players/player2').exists()) || (data.child('players/player2/uid').val() === auth.uid && !data.child('players/player1').exists()) || data.child('createdAt').val() < now - 86400000)))",
         ".validate": "$code.matches(/^[A-HJKMNP-Z2-9]{4}$/) && newData.hasChildren(['createdAt', 'currentMatch'])",
 
         "createdAt": {

@@ -1,0 +1,121 @@
+import {
+  onDisconnect,
+  onValue,
+  ref,
+  remove,
+  runTransaction,
+  serverTimestamp,
+  set,
+  update,
+  type Database,
+} from 'firebase/database';
+import type { NewRoom, RoomGateway, Unsubscribe } from '../../application/ports';
+import type { Room } from '../../domain/room';
+import type { MatchId, Move, PlayerId, PlayerSlot, RoomCode } from '../../domain/types';
+import { toRoom } from './roomMapper';
+
+/** Implementa `RoomGateway` no Realtime Database. O formato dos dados está em database.rules.json. */
+export class FirebaseRoomGateway implements RoomGateway {
+  constructor(private readonly db: Database) {}
+
+  async create({ code, host, matchId }: NewRoom): Promise<boolean> {
+    const result = await runTransaction(
+      this.roomRef(code),
+      (current: unknown) =>
+        current === null
+          ? { createdAt: serverTimestamp(), currentMatch: matchId, players: { player1: newPresence(host) } }
+          : undefined, // código já em uso: aborta
+      { applyLocally: false },
+    );
+    return result.committed;
+  }
+
+  async get(code: RoomCode): Promise<Room | null> {
+    return new Promise((resolve, reject) => {
+      onValue(this.roomRef(code), (snapshot) => resolve(toRoom(code, snapshot.val())), reject, { onlyOnce: true });
+    });
+  }
+
+  async claimSlot(code: RoomCode, slot: PlayerSlot, player: PlayerId): Promise<boolean> {
+    try {
+      const result = await runTransaction(
+        this.slotRef(code, slot),
+        (current: unknown) => (current === null ? newPresence(player) : undefined),
+        { applyLocally: false },
+      );
+      return result.committed;
+    } catch {
+      // As regras recusam se a sala sumiu ou a vaga foi tomada no meio do caminho.
+      return false;
+    }
+  }
+
+  releaseSlot(code: RoomCode, slot: PlayerSlot): Promise<void> {
+    return remove(this.slotRef(code, slot));
+  }
+
+  deleteRoom(code: RoomCode): Promise<void> {
+    return remove(this.roomRef(code));
+  }
+
+  watch(code: RoomCode, onChange: (room: Room | null) => void, onError: (error: unknown) => void): Unsubscribe {
+    return onValue(this.roomRef(code), (snapshot) => onChange(toRoom(code, snapshot.val())), onError);
+  }
+
+  trackPresence(code: RoomCode, slot: PlayerSlot): Unsubscribe {
+    const slotRef = this.slotRef(code, slot);
+    const offline = { connected: false, seenAt: serverTimestamp() };
+    // `.info/connected` volta a `true` a cada reconexão: o onDisconnect é registrado de novo.
+    const stop = onValue(ref(this.db, '.info/connected'), (snapshot) => {
+      if (snapshot.val() !== true) return;
+      void onDisconnect(slotRef)
+        .update(offline)
+        .then(() => update(slotRef, { connected: true, seenAt: serverTimestamp() }))
+        .catch(() => undefined); // vaga já liberada: nada a marcar
+    });
+    return () => {
+      stop();
+      void onDisconnect(slotRef).cancel().catch(() => undefined);
+    };
+  }
+
+  commit(code: RoomCode, matchId: MatchId, round: number, slot: PlayerSlot, commit: string): Promise<void> {
+    return set(ref(this.db, `${this.roundPath(code, matchId, round)}/${slot}/commit`), commit);
+  }
+
+  reveal(code: RoomCode, matchId: MatchId, round: number, slot: PlayerSlot, move: Move, nonce: string): Promise<void> {
+    return set(ref(this.db, `${this.roundPath(code, matchId, round)}/${slot}/reveal`), {
+      move,
+      nonce,
+      at: serverTimestamp(),
+    });
+  }
+
+  requestReset(code: RoomCode, by: PlayerId): Promise<void> {
+    return set(ref(this.db, `rooms/${code}/resetRequest`), { by, at: serverTimestamp() });
+  }
+
+  clearResetRequest(code: RoomCode): Promise<void> {
+    return remove(ref(this.db, `rooms/${code}/resetRequest`));
+  }
+
+  startNewMatch(code: RoomCode, matchId: MatchId): Promise<void> {
+    return update(this.roomRef(code), { currentMatch: matchId, resetRequest: null });
+  }
+
+  private roomRef(code: RoomCode) {
+    return ref(this.db, `rooms/${code}`);
+  }
+
+  private slotRef(code: RoomCode, slot: PlayerSlot) {
+    return ref(this.db, `rooms/${code}/players/${slot}`);
+  }
+
+  private roundPath(code: RoomCode, matchId: MatchId, round: number): string {
+    return `rooms/${code}/matches/${matchId}/rounds/${round}`;
+  }
+}
+
+function newPresence(player: PlayerId) {
+  return { uid: player, connected: true, seenAt: serverTimestamp(), joinedAt: serverTimestamp() };
+}

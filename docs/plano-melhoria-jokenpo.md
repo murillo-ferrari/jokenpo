@@ -119,7 +119,6 @@ jokenpo/
 │   ├── infrastructure/            # implementa as portas
 │   │   ├── firebase/client.ts     # SDK modular v11+, config via import.meta.env
 │   │   ├── firebase/roomGateway.ts# DTO do banco ↔ tipos do domínio
-│   │   ├── firebase/presence.ts   # onDisconnect()
 │   │   ├── firebase/identity.ts   # Auth anônima (uid persistente)
 │   │   ├── webCryptoHasher.ts
 │   │   └── clipboard.ts
@@ -238,17 +237,30 @@ A antiga Fase 0, uma correção emergencial no código atual, foi descartada: a 
   - hash conferido com `node:crypto`;
   - alfabeto do código conferido com a regex das regras do banco.
 
-### Fase 3: aplicação e infraestrutura (≈1 dia)
+### Fase 3: aplicação e infraestrutura (≈1 dia) ✅ concluída em 06/11/2026
 
-- [ ] `ports.ts` com `RoomGateway` (create, join, subscribe, commit, reveal, requestReset, respondReset, leave).
-- [ ] Casos de uso:
-  - `createRoom`: tenta códigos até achar um livre, usando uma transação que **aborta** se o código existir (corrige B5 e B6).
-  - `joinRoom`: valida antes de mudar de tela (corrige B7).
-  - `playMove`, `resetMatch` e `leaveRoom`.
-- [ ] `gameSession.ts`: snapshot → `GameViewModel` (fase, placar, botões habilitados, mensagens). Testado com gateway em memória.
-- [ ] `firebase/roomGateway.ts`: mapeamento entre DTO e domínio; nada de efeito colateral dentro de `runTransaction` (B8).
-- [ ] `presence.ts` com `onDisconnect`, `identity.ts` com uid persistente e `webCryptoHasher.ts`.
-- [ ] `firebase-rules.test.ts` no emulador: não lê o slot alheio, não reescreve o commit, não revela antes da hora.
+- [x] `ports.ts`: `RoomGateway`, `Identity`, `Clock`, `Random` e `SessionStore`.
+- [x] `domain/room.ts`: tipo `Room`, vaga do jogador, vaga disponível e status do adversário (conectado, desconectado ou abandonado depois de 60 s).
+- [x] Casos de uso:
+  - `createRoom`: sorteia outro código se o sorteado já existir (corrige B5 e B6).
+  - `joinRoom`: valida antes de mudar de tela (B7); volta para a mesma vaga depois de um F5 (B10); ocupa vaga abandonada.
+  - `playMove`: o commit guarda jogada e nonce no navegador **antes** de publicar, para revelar mesmo depois de um F5.
+  - `resetMatch`: pedir, aceitar, recusar ou cancelar; aceitar começa uma partida nova (B13).
+  - `leaveRoom`: o último a sair apaga a sala.
+- [x] `gameSession.ts`: transforma a sala em `GameView`, do ponto de vista de quem joga ("eu" e "adversário"), mais avisos (`Notice`) que a UI traduz. Também cuida das ações automáticas:
+  - revelar a jogada quando os dois já escolheram;
+  - reavaliar no fim do prazo para dar W.O.;
+  - liberar a vaga de quem sumiu;
+  - começar partida nova quando o adversário sai;
+  - limpar o pedido de reset de quem saiu.
+- [x] `firebase/roomGateway.ts` + `roomMapper.ts`: transações sem efeito colateral (B8); rodadas lidas tanto em array quanto em objeto.
+- [x] Presença com `onDisconnect`, registrada de novo a cada reconexão (`.info/connected`). Isso substitui `unload`/`pagehide` (B9).
+- [x] `serverClock.ts` (horário do servidor), `cryptoRandom.ts` e `localSessionStore.ts`, que tolera `localStorage` bloqueado.
+- [x] Regras do banco: a sala é apagada pelo último jogador, e não mais só pelo `player1`. Assim, o anfitrião sair não derruba a partida do outro.
+- [x] Testes:
+  - 26 cenários do `GameSession` com dois jogadores num servidor em memória (`test/support/fakeServer.ts`);
+  - 8 da conversão dos dados do banco;
+  - 1 de ponta a ponta no emulador: criar, entrar, jogar, resetar e sair, com o gateway real e as regras valendo.
 
 ### Fase 4: interface (≈1 dia)
 

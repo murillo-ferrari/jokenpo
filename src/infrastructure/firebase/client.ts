@@ -53,8 +53,9 @@ export function readFirebaseOptions(env: Env): FirebaseOptions {
   return options;
 }
 
-export function createFirebaseClient(env: Env): FirebaseClient {
-  const app = initializeApp(readFirebaseOptions(env));
+/** `appName` permite várias instâncias no mesmo processo (testes simulando dois jogadores). */
+export function createFirebaseClient(env: Env, appName?: string): FirebaseClient {
+  const app = initializeApp(readFirebaseOptions(env), appName);
   const auth = getAuth(app);
   const database = getDatabase(app);
 
