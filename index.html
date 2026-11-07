@@ -1,103 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Online Jokenpo</title>
-    <link rel="stylesheet" href="assets/css/styles.css">
-</head>
-
-<body>
-    <h1>🎮 Online Jokenpo</h1>
-
-    <main id="setup" role="main">
-        <div class="join-room-container">
-            <div class="join-room-interaction-container">
-                <label for="roomId" class="visually-hidden">Room ID</label>
-                <input type="text" id="roomId" placeholder="Room ID" maxlength="4" aria-describedby="room-id-help"
-                    autocomplete="off">
-                <div id="room-id-help" class="help-text">Enter 4 characters (letters and numbers)</div>
-                <button onclick="joinRoom()" aria-label="Join existing game room">Join Room</button>
-            </div>
-        </div>  
-            
-        <div class="create-room-btn-container">
-            <button class="create-room-btn" onclick="createRoom()" aria-label="Create new game room">Create New Room</button>
-        </div>
-    </main>
-
-    <div id="waiting" style="display: none" role="status" aria-live="polite">
-        <div class="loading-spinner" aria-hidden="true"></div>
-        Waiting for opponent...
-    </div>
-
-    <div id="toast" role="status" aria-live="polite" class="toast" hidden></div>
-
-    <section id="share-room" role="region" aria-label="Share room with friend">
-        <p>Share this room ID with a friend:</p>
-        <div class="share-room-container">
-            <div id="room-id-display" aria-label="Room ID to share"></div>
-            <button id="copy-btn" onclick="copyRoomId()" aria-label="Copy room ID to clipboard">Copy Room ID</button>
-        </div>
-    </section>
-
-    <main id="game" role="main">
-        <h2>Make your move:</h2>
-        <div class="move-buttons" role="group" aria-label="Game moves">
-            <button id="rock-btn" onclick="playMove('rock')" aria-label="Play Rock - crushes scissors"
-                class="move-button">✊ Rock</button>
-            <button id="paper-btn" onclick="playMove('paper')" aria-label="Play Paper - covers rock"
-                class="move-button">✋ Paper</button>
-            <button id="scissors-btn" onclick="playMove('scissors')" aria-label="Play Scissors - cuts paper"
-                class="move-button">✌️ Scissors</button>
-        </div>
-
-        <div class="choice-display" role="region" aria-label="Game results">
-            <span id="player-choice" aria-label="Your choice">?</span>
-            <span class="vs-text" aria-hidden="true">vs</span>
-            <span id="opponent-choice" aria-label="Opponent's choice">?</span>
-        </div>
-
-        <div id="result"></div>
-
-        <section class="scores" role="region" aria-label="Game statistics">
-            <div class="score-display">
-                <span class="player-score">You: <span id="player-score" aria-label="Your score"> 0</span></span>
-                <span class="separator" aria-hidden="true">|</span>
-                <span class="opponent-score">Opponent: <span id="opponent-score" aria-label="Opponent score">
-                        0</span></span>
-            </div>
-            <div class="game-stats">
-                <div class="rounds">Rounds: <span id="total-rounds" aria-label="Total rounds played"> 0</span></div>
-                <span class="separator" aria-hidden="true">|</span>
-                <div class="ties">Ties: <span id="total-ties" aria-label="Number of ties"> 0</span></div>
-            </div>
-        </section>
-
-        <div class="reset-container">
-            <button class="reset-btn" onclick="requestReset()" aria-label="Reset game scores and start over">Reset Game</button>
-            <div id="reset-confirm" hidden>
-                <div class="reset-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="reset-confirm-title">
-                    <p id="reset-confirm-title">Opponent wants to reset. Accept?</p>
-                    <div class="reset-confirm-btns-container">
-                        <button class="reset-confirm-btn-yes" onclick="confirmReset(true)">Yes</button>
-                        <button class="reset-confirm-btn-no" onclick="confirmReset(false)">No</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
-
-        <!-- Include local Firebase config -->
-        <!-- <script src="assets/js/localConfig.js"></script> -->
-
-        <!-- Load Firebase -->
-        <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
-
-        <!-- Game Logic -->
-        <script type="module" src="assets/js/main.js"></script>
-</body>
-
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Jokenpô online: jogue pedra, papel e tesoura com um amigo em tempo real, ou contra o computador." />
+    <meta name="theme-color" content="#4338ca" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <title>Jokenpô Online</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

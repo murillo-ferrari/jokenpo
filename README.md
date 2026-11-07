@@ -1,223 +1,123 @@
-# 🎮 Online Jokenpo
+# Jokenpô Online
 
-A real-time multiplayer Rock-Paper-Scissors game built with vanilla JavaScript and Firebase Realtime Database. Play with friends from anywhere using simple room codes!
+Pedra, papel e tesoura com um amigo, em tempo real, ou contra o computador. Sem cadastro: cria a sala, manda o link e joga.
 
-## ✨ Features
+**Jogar:** https://murillo-ferrari.github.io/jokenpo
 
-- **Real-time Multiplayer**: Play with anyone by sharing a simple 4-character room code
-- **Live Score Tracking**: Automatic score calculation with round and tie statistics
-- **Reset Functionality**: Request game resets with opponent approval system
-- **Smart Room Management**: Automatic cleanup when players leave, allowing rooms to be reused
-- **Leave Confirmation**: Browser warns before accidentally leaving an active game
-- **Graceful Error Handling**: User-friendly error messages with automatic UI recovery
-- **Responsive Design**: Optimized for both desktop and mobile devices
-- **Accessibility First**: Full ARIA support and keyboard navigation
-- **Toast Notifications**: Non-intrusive feedback for game events
-- **Copy to Clipboard**: One-click room code sharing with fallback support
-- **Secure Config**: Environment-based Firebase configuration for deployment
+## Funcionalidades
 
-## 🚀 Live Demo
+- **Partida online por código ou link**: quem cria a sala recebe um código de 4 caracteres (sem 0/O, 1/I/L, para não confundir ao ditar) e um link de convite `?sala=AB23`, que no celular abre o compartilhamento nativo.
+- **Sem trapaça**: cada jogada é publicada primeiro só como um hash (*commit-reveal*). Ninguém vê a jogada do outro antes de escolher, e ninguém troca de jogada depois de ver a do outro.
+- **Formatos**: partida livre ou melhor de 3, 5 ou 7 (empates não contam), com tela de vencedor e revanche.
+- **Prazo para escolher**: quando um jogador escolhe, o outro tem 5, 10 ou 15 s (definido ao criar a sala) para escolher, com contagem na tela e bipe nos últimos segundos. Se o tempo acabar, perde a rodada por W.O.
+- **Contra o computador**: funciona sem internet, sem prazo.
+- **Placar sempre igual para os dois**: não é gravado em lugar nenhum, é calculado a partir das rodadas.
+- **Recomeçar a partida** com aceite do adversário, **apelidos** opcionais, **histórico** das rodadas e indicador de **presença** (online/desconectado).
+- **Volta para a partida depois de um F5**, inclusive no meio de uma rodada.
+- **pt-BR e inglês**, **tema claro e escuro** (segue o sistema), **acessível** (leitor de tela, teclado, contraste AA, sem animação para quem pede menos movimento) e **instalável** (PWA).
 
-Visit the live application: [https://murillo-ferrari.github.io/jokenpo](https://murillo-ferrari.github.io/jokenpo)
+## Como jogar
 
-## 🎯 How to Play
+1. Escolha o formato e o tempo para escolher e clique em **Criar sala**.
+2. Mande o link ou o código para quem vai jogar com você.
+3. Quando a outra pessoa entrar, escolham **Pedra**, **Papel** ou **Tesoura**. A jogada do adversário só aparece depois da contagem "Jo… Ken… Pô!".
 
-1. **Create a Room**: Click "Create New Room" to generate a unique 4-character room code
-2. **Share the Code**: Copy and share your room code with a friend
-3. **Join the Game**: Your friend enters the code and clicks "Join Room"
-4. **Make Your Move**: Choose Rock (✊), Paper (✋), or Scissors (✌️)
-5. **See Results**: Results appear automatically when both players have chosen
-6. **Track Progress**: View your scores, total rounds, and ties in real-time
+## Tecnologia
 
-## 🛠️ Technology Stack
+- **Front-end**: [Preact](https://preactjs.com/) + TypeScript (modo estrito), empacotado com [Vite](https://vite.dev/).
+- **Tempo real**: Firebase Realtime Database, com login anônimo (Firebase Auth).
+- **Testes**: [Vitest](https://vitest.dev/), Testing Library com happy-dom e o emulador do Firebase para regras do banco e integração.
+- **Hospedagem**: GitHub Pages, com deploy pelo GitHub Actions.
 
-- **Frontend**: Vanilla JavaScript (ES6+ modules)
-- **Database**: Firebase Realtime Database
-- **Hosting**: GitHub Pages
-- **CI/CD**: GitHub Actions
-- **Styling**: Pure CSS with custom properties and responsive design
+## Arquitetura
 
-## 📁 Project Structure
+O código é separado em quatro camadas. Um teste (`test/architecture.test.ts`) falha se alguma camada importar o que não deve.
+
+| Camada | O que tem | Pode importar |
+|---|---|---|
+| `src/domain/` | Regras puras: quem vence, commit-reveal, placar, prazos, código da sala, apelido. Sem Firebase, DOM ou relógio. | Só `domain` |
+| `src/application/` | Casos de uso (criar/entrar/jogar/recomeçar/sair) e o `GameSession`, que transforma a sala no que a tela mostra. | `domain`, `application` |
+| `src/infrastructure/` | Firebase (gateway, presença, relógio do servidor), navegador (`localStorage`, aleatoriedade) e salas em memória com o adversário-computador. | `domain`, `application/ports.ts` |
+| `src/ui/` | Telas e componentes Preact, textos (`i18n/`), estilos (`styles/`). | `domain/types.ts`, `application`, `ui` |
+
+`src/main.tsx` e `src/computerGame.ts` são os únicos pontos que ligam tudo (composition root).
+
+### Modelo de dados
 
 ```
-jokenpo/
-├── .github/
-│   └── workflows/
-│       └── deploy.yml          # GitHub Pages deployment pipeline
-├── assets/
-│   ├── css/
-│   │   └── styles.css          # Main stylesheet with responsive design
-│   └── js/
-│       ├── elements.js         # DOM element references
-│       ├── firebaseConfig.js   # Firebase initialization
-│       ├── gameLogic.js        # Core game logic and Firebase interactions
-│       ├── localConfig.js      # Local development config (gitignored)
-│       ├── main.js             # Application entry point
-│       ├── scripts.js          # Legacy script
-│       └── state.js            # Application state management
-├── .gitignore                  # Git ignore rules
-├── index.html                  # Main HTML file
-└── README.md                   # This file
+rooms/{código}
+  createdAt, bestOf, choiceSeconds, currentMatch
+  players/player1|player2: { uid, name?, seenAt, joinedAt, connections: { [id]: true } }
+  matches/{partida}/rounds/{n}/player1|player2: { commit, at, reveal?: { move, nonce, at } }
+  resetRequest?: { by, at }
 ```
 
-## 🔧 Local Development
+- **Uma conexão por aba**: o jogador está conectado enquanto houver alguma conexão; a queda de uma aba é registrada pelo próprio servidor (`onDisconnect`).
+- **Recomeçar = nova partida** (`currentMatch`): o histórico fica, o placar zera.
+- **Prazos com o horário do servidor**: 5, 10 ou 15 s para escolher, 5 s para revelar e 60 s sem conexão para liberar a vaga. Por isso o relógio do celular não interfere, e um resultado mostrado nunca muda depois.
 
-### Prerequisites
+As regras do banco (`database.rules.json`) garantem tudo isso do lado do servidor:
+- só quem está logado acessa uma sala, e ninguém lista as salas;
+- cada um escreve só na própria vaga;
+- o commit e o reveal são gravados uma única vez, e o reveal só depois dos dois commits;
+- todo horário tem de ser o do servidor;
+- o formato da partida e o tempo para escolher não mudam depois que a sala é criada;
+- só o adversário pode aceitar um pedido para recomeçar.
 
-- A modern web browser (Chrome, Firefox, Safari, or Edge)
-- A Firebase project with Realtime Database enabled
-- Git (for version control)
+## Rodando localmente
 
-### Setup
+**Requisitos:**
+- **Node.js 24.**
+- **Java 21:** usado pelo emulador do Firebase. No macOS, baixe o instalador `.pkg` em [adoptium.net](https://adoptium.net/temurin/releases/?version=21); se usa Homebrew, `brew install openjdk@21` também funciona, mas exige ajustar o `PATH`.
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/murillo-ferrari/jokenpo.git
-   cd jokenpo
-   ```
+```bash
+npm install
+cp .env.example .env.local      # já vem com VITE_USE_EMULATORS=true
+npm run dev:emulators           # terminal 1: emuladores de Auth e Database (projeto demo, sem credenciais)
+npm run dev                     # terminal 2: http://127.0.0.1:5173/jokenpo/
+```
 
-2. **Configure Firebase** (for local testing):
-   
-   Create `assets/js/localConfig.js` with your Firebase credentials:
-   ```javascript
-   (function setLocalFirebaseConfig() {
-     if (typeof window === "undefined") {
-       return;
-     }
+A interface do emulador fica em http://127.0.0.1:4000.
 
-     window.__LOCAL_FIREBASE_CONFIG__ = {
-       apiKey: "YOUR_API_KEY",
-       authDomain: "YOUR_AUTH_DOMAIN",
-       databaseURL: "YOUR_DATABASE_URL",
-       projectId: "YOUR_PROJECT_ID",
-       storageBucket: "YOUR_STORAGE_BUCKET",
-       messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-       appId: "YOUR_APP_ID",
-       measurementId: "YOUR_MEASUREMENT_ID"
-     };
-   })();
-   ```
+Para simular dois jogadores no mesmo navegador, abra uma aba em `127.0.0.1` e outra em `localhost` (ou use uma janela anônima): abas da mesma origem compartilham o login e viram o mesmo jogador.
 
-   > **Note**: This file is already in `.gitignore` and won't be committed.
+Para apontar para um projeto real do Firebase, preencha as variáveis `VITE_FIREBASE_*` no `.env.local` e use `VITE_USE_EMULATORS=false`.
 
-3. **Serve locally**:
-   
-   Use any local web server. For example:
-   ```bash
-   # Using Python 3
-   python -m http.server 8000
-   
-   # Using Node.js http-server
-   npx http-server -p 8000
-   
-   # Using PHP
-   php -S localhost:8000
-   ```
+## Testes
 
-4. **Open in browser**:
-   ```
-   http://localhost:8000
-   ```
+```bash
+npm run typecheck      # TypeScript
+npm test               # unitários, de sessão, de interface, de contraste e de arquitetura
+npm run test:emulator  # regras do banco e integração com o Firebase (precisa de Java)
+npm run build          # checagem de tipos + build de produção em dist/
+```
 
-## 🚢 Deployment
+## Deploy
 
-The project uses GitHub Actions for automated deployment to GitHub Pages.
+O workflow `.github/workflows/deploy.yml` roda os testes em todo push e pull request. Na `main`, ele também faz o build e publica `dist/` no GitHub Pages.
 
-### Required GitHub Secrets
-
-Configure these secrets in your repository settings (`Settings > Secrets and variables > Actions`):
-
+**Segredos necessários** em *Settings → Secrets and variables → Actions*:
 - `FIREBASE_API_KEY`
 - `FIREBASE_AUTH_DOMAIN`
 - `FIREBASE_DATABASE_URL`
 - `FIREBASE_PROJECT_ID`
-- `FIREBASE_STORAGE_BUCKET`
-- `FIREBASE_MESSAGING_SENDER_ID`
 - `FIREBASE_APP_ID`
 
-### Deploy Process
+**As regras do banco não são publicadas pelo workflow:**
 
-1. Push to the `main` branch:
-   ```bash
-   git add .
-   git commit -m "Your commit message"
-   git push origin main
-   ```
+```bash
+npx firebase login
+npx firebase deploy --only database --project <id-do-projeto>
+```
 
-2. GitHub Actions will automatically:
-   - Inject Firebase configuration from secrets
-   - Build the deployment package
-   - Deploy to GitHub Pages
+Publique as regras junto com a versão do app que as usa: regras e app dependem do mesmo formato de dados.
 
-3. Your site will be live at: `https://[your-username].github.io/jokenpo`
+**No console do Firebase**, ative o **login anônimo** em *Authentication → Sign-in method*.
 
-## 🎨 Key Features Explained
+## Documentação
 
-### Real-time Synchronization
+- `docs/plano-melhoria-jokenpo.md`: revisão do projeto original, decisões e histórico da reescrita.
 
-The game uses Firebase Realtime Database listeners to synchronize game state between players instantly. When one player makes a move, the other player sees it in real-time without refreshing.
+## Licença
 
-### Score Calculation
-
-Scores are calculated server-side using Firebase transactions to prevent race conditions and ensure consistency between players.
-
-### Reset System
-
-The reset functionality uses a request-approval pattern:
-1. One player requests a reset
-2. The opponent receives a modal dialog to accept or decline
-3. If accepted, both players' scores and game state reset
-4. If declined, the requester is notified via toast
-
-### Room Cleanup and Session Management
-
-The game automatically handles player disconnections and departures:
-
-- **Leave Confirmation**: When a player tries to close or refresh the page during an active game, the browser shows a warning dialog to prevent accidental exits
-- **Automatic Cleanup**: When Player 2 leaves a room, they are automatically removed and Player 1 returns to the waiting screen, allowing the room to accept a new Player 2
-- **Room Deletion**: If Player 1 leaves, the entire room is deleted from the database, freeing up the room code for reuse
-- **Smooth Transitions**: All state changes happen smoothly without page reloads, providing a seamless user experience
-- **Error Recovery**: If a room becomes full or is deleted while someone tries to join, they receive a helpful toast message and are returned to the home screen
-
-> **Note**: The browser's leave confirmation message is generic (e.g., "Leave site? Changes you made may not be saved") and cannot be customized for security reasons. This is a browser security feature to prevent malicious sites from showing fake messages.
-
-### Accessibility
-
-- Semantic HTML5 elements
-- ARIA labels and live regions
-- Keyboard navigation support
-- Screen reader friendly
-- High contrast mode support
-- Reduced motion support
-
-## 🐛 Known Issues
-
-- Room codes must be exactly 4 characters (enforced by validation)
-- Maximum 2 players per room (attempts to join full rooms are handled gracefully)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is open source and available under the [MIT License](LICENSE).
-
-## 👤 Author
-
-**Murillo Ferrari**
-
-- GitHub: [@murillo-ferrari](https://github.com/murillo-ferrari)
-- Project: [jokenpo](https://github.com/murillo-ferrari/jokenpo)
-
-## 🙏 Acknowledgments
-
-- Firebase for real-time database infrastructure
-- GitHub Pages for free hosting
-- The open-source community for inspiration and tools
+[MIT](LICENSE) © Murillo Ferrari

@@ -1,97 +1,82 @@
-name: Deploy to GitHub Pages
+name: Testes e deploy
 
 on:
   push:
-    branches: [ "main" ]
+  pull_request:
+  workflow_dispatch:
 
 permissions:
-  pages: write
-  id-token: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      
-      - name: Inject Firebase config
+          node-version: '24'
+          cache: npm
+
+      # O emulador do Firebase roda em Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache dos emuladores do Firebase
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('package-lock.json') }}
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:emulator
+
+  build:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
         env:
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: |
-          set -euo pipefail
+          VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
 
-          node <<'NODE'
-            const fs = require('fs');
-            const path = 'assets/js/firebaseConfig.js';
-            const placeholder = '@@FIREBASE_CONFIG@@';
-
-            const requiredKeys = [
-              'FIREBASE_API_KEY',
-              'FIREBASE_AUTH_DOMAIN',
-              'FIREBASE_DATABASE_URL',
-              'FIREBASE_PROJECT_ID',
-              'FIREBASE_STORAGE_BUCKET',
-              'FIREBASE_MESSAGING_SENDER_ID',
-              'FIREBASE_APP_ID'
-            ];
-
-            for (const key of requiredKeys) {
-              if (!process.env[key]) {
-                throw new Error(`Missing required Firebase secret: ${key}`);
-              }
-            }
-
-            const config = {
-              apiKey: process.env.FIREBASE_API_KEY,
-              authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-              databaseURL: process.env.FIREBASE_DATABASE_URL,
-              projectId: process.env.FIREBASE_PROJECT_ID,
-              storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-              messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-              appId: process.env.FIREBASE_APP_ID
-            };
-
-            if (process.env.FIREBASE_MEASUREMENT_ID) {
-              config.measurementId = process.env.FIREBASE_MEASUREMENT_ID;
-            }
-
-            const encodedConfig = Buffer.from(JSON.stringify(config)).toString('base64');
-
-            const fileContent = fs.readFileSync(path, 'utf8');
-            if (!fileContent.includes(placeholder)) {
-              throw new Error(`Placeholder "${placeholder}" not found in ${path}`);
-            }
-
-            fs.writeFileSync(path, fileContent.replace(new RegExp(placeholder, 'g'), encodedConfig));
-            console.log('Firebase config injected successfully.');
-          NODE
-          
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: dist
 
   deploy:
     needs: build
+    runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy no GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
