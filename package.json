@@ -33,5 +33,16 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.6",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "^1.14.7"
+    },
+    "glob@10": {
+      "minimatch": "^11.0.5"
+    },
+    "gaxios": {
+      "uuid": "^11.1.1"
+    }
   }
 }
