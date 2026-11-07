@@ -175,7 +175,7 @@ rooms/{code}
 
 1. Cada jogador grava `commit = SHA-256("move:nonce")`. O adversário não consegue saber a jogada a partir do hash.
 2. As regras só permitem gravar `reveal` quando os dois `commit` já existem.
-3. Cada cliente confere `hash(reveal) === commit` do adversário. Se não bater, a rodada vai para o adversário na hora. Se um jogador não revelar em até 15 s depois do outro, perde por W.O. O prazo é medido pelo `at` do reveal, que as regras obrigam a ser o horário do servidor; assim, o resultado de uma rodada concluída nunca muda depois de mostrado.
+3. Cada cliente confere `hash(reveal) === commit` do adversário. Se não bater, a rodada vai para o adversário na hora. Se um jogador não revelar em até 5 s depois do outro, perde por W.O. (eram 15 s; reduzido para 5 s, já que o reveal é automático e leva milissegundos). O prazo é medido pelo `at` do reveal, que as regras obrigam a ser o horário do servidor; assim, o resultado de uma rodada concluída nunca muda depois de mostrado.
 
 **O que esse modelo elimina:**
 
@@ -218,7 +218,7 @@ A antiga Fase 0, uma correção emergencial no código atual, foi descartada: a 
 - [x] Ajustar o workflow: testes em todo push e PR; build e deploy de `dist/` só na `main`.
 - [x] Criar `test/architecture.test.ts` e as pastas das camadas.
 - [x] Atualizar o `.gitignore` com `node_modules`, `dist` e `.env.local`.
-- [x] Mover o código antigo para `legacy/`, como referência até a Fase 4. A pasta será apagada no fim da reescrita.
+- [x] Mover o código antigo para `legacy/`, como referência até a Fase 4. A pasta foi apagada na Fase 6; o código antigo continua no histórico do git.
 
 **Atenção:** as regras novas **não** devem ir para produção antes de o app novo ser publicado. Elas rejeitam o formato de dados do app atual e o quebrariam. O deploy das regras (`npx firebase deploy --only database`) acontece junto com o merge da reescrita na `main`.
 
@@ -415,11 +415,28 @@ O ícone antigo era um emoji ✊ num quadrado azul. Foram propostos três concei
     - no emulador, fechar uma aba remove só a conexão dela, e a queda de rede (`goOffline`) faz o servidor remover a conexão sozinho.
   - Resultado: 192 testes unitários e 50 no emulador.
 
-### Fase 6: documentação
+### Fase 6: documentação ✅ concluída em 06/11/2026
 
-- [ ] README em pt-BR, fiel ao código: arquitetura, modelo de dados, como rodar com o emulador do Firebase.
-- [ ] Adicionar `LICENSE` (MIT) ou remover o link.
-- [ ] `CLAUDE.md` com as regras de camadas e os comandos.
+- [x] README em pt-BR, fiel ao código:
+  - funcionalidades e como jogar;
+  - tecnologia, arquitetura em camadas e modelo de dados;
+  - o que as regras do banco garantem;
+  - como rodar com os emuladores (inclusive Java 21);
+  - testes e deploy, com os segredos e a publicação manual das regras.
+- [x] `LICENSE` (MIT, © 2025-2026 Murillo Ferrari).
+- [x] `CLAUDE.md`, no formato dos outros projetos:
+  - comandos e camadas;
+  - regras inegociáveis (placar derivado, constantes que precisam bater com as regras, presença por conexão, sem `else if`, contraste, CLS);
+  - decisões de UX já tomadas;
+  - como o usuário espera os testes (com mutação) e a regra de commit só com confirmação.
+- [x] Pasta `legacy/` removida.
+
+### Publicação (próximo passo)
+
+1. Push da branch `reescrita` e PR para a `main`.
+2. **No mesmo momento do merge**: `npx firebase deploy --only database`. As regras novas rejeitam o formato de dados do app antigo, e o app novo não funciona com as regras antigas.
+3. Conferir o deploy do GitHub Pages e jogar uma partida online e uma contra o computador no site publicado.
+4. Reavaliar a hospedagem (seção 5).
 
 ---
 
@@ -440,3 +457,5 @@ O ícone antigo era um emoji ✊ num quadrado azul. Foram propostos três concei
 ## 6. Ordem sugerida
 
 Fases 1, 2 e 3 em sequência; a 2 pode começar em paralelo com a 1, porque o domínio não depende de nada. Depois a 4 e a 6, por fim avaliar a hospedagem. A 5 fica sob demanda.
+
+**Status em 06/11/2026:** fases 1 a 6 concluídas na branch `reescrita`; falta a publicação.
