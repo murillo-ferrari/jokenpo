@@ -4,7 +4,7 @@ import { DEFAULT_CHOICE_TIMEOUT_MS, DEFAULT_REVEAL_TIMEOUT_MS } from '../src/dom
 import { STALE_PLAYER_MS } from '../src/domain/room';
 import type { BestOf, Move, RoomCode } from '../src/domain/types';
 import { GameSession } from '../src/application/gameSession';
-import { FakeServer, createPlayer, nodeRandom, settle, type TestPlayer } from './support/fakeServer';
+import { FakeServer, OfflineableGateway, createPlayer, nodeRandom, settle, type TestPlayer } from './support/fakeServer';
 
 let server: FakeServer;
 
@@ -517,6 +517,57 @@ describe('apelidos', () => {
     await bob.session.setNickname('   ');
     await settle();
     expect(playing(alice).opponentName).toBeNull();
+  });
+});
+
+describe('sem rede: o servidor não responde', () => {
+  const TIMEOUT = 30;
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  function offlinePlayer(name: string) {
+    const gateway = new OfflineableGateway(server, name as never);
+    return { gateway, player: createPlayer(server, name, { gateway, connectTimeoutMs: TIMEOUT }) };
+  }
+
+  it('voltar à sala salva desiste a tempo, avisa e NÃO esquece a sala', async () => {
+    const { player } = offlinePlayer('alice');
+    player.store.room = 'AB23' as RoomCode;
+    const starting = player.session.start();
+    await settle();
+    expect(player.view()).toMatchObject({ screen: 'home', busy: true });
+
+    await wait(TIMEOUT + 20);
+    await starting;
+    expect(player.view()).toEqual({ screen: 'home', busy: false, error: 'unreachable', nickname: null });
+    expect(player.store.room).toBe('AB23'); // volta a ela quando a rede voltar
+  });
+
+  it('criar sala sem rede desiste a tempo e avisa', async () => {
+    const { player } = offlinePlayer('alice');
+    await player.session.start();
+    const creating = player.session.createRoom();
+    await wait(TIMEOUT + 20);
+    await creating;
+    expect(player.view()).toMatchObject({ screen: 'home', busy: false, error: 'unreachable' });
+  });
+
+  it('quando a rede volta, entrar funciona de novo', async () => {
+    const host = createPlayer(server, 'host');
+    await host.session.start();
+    await host.session.createRoom();
+    await settle();
+
+    const { gateway, player } = offlinePlayer('alice');
+    await player.session.start();
+    const joining = player.session.joinRoom(codeOf(host));
+    await wait(TIMEOUT + 20);
+    await joining;
+    expect(player.view()).toMatchObject({ error: 'unreachable' });
+
+    gateway.offline = false;
+    await player.session.joinRoom(codeOf(host));
+    await settle();
+    expect(player.view().screen).toBe('playing');
   });
 });
 

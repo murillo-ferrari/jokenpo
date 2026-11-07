@@ -18,6 +18,8 @@ export interface GameSessionDeps {
   store: SessionStore;
   /** Partida contra o computador: só muda o que a tela mostra. */
   vsComputer?: boolean;
+  /** Quanto esperar o servidor ao criar/entrar numa sala antes de desistir. Padrão: CONNECT_TIMEOUT_MS. */
+  connectTimeoutMs?: number;
   /**
    * Prazo para escolher a jogada. Sem valor: o tempo definido na sala. `null` desliga
    * (contra o computador). Um número substitui o da sala (testes).
@@ -36,6 +38,35 @@ interface ActiveRoom {
 
 /** Folga depois de um prazo antes de reavaliar, para não cair exatamente na borda. */
 const TIMER_MARGIN_MS = 50;
+
+/**
+ * Sem conexão, o Firebase espera a rede voltar indefinidamente. Depois deste tempo,
+ * criar/entrar desiste e a tela inicial volta a funcionar (inclusive o jogo contra o computador).
+ */
+export const CONNECT_TIMEOUT_MS = 10_000;
+
+class ConnectionTimeout extends Error {
+  constructor() {
+    super('O servidor não respondeu a tempo.');
+  }
+}
+
+/** Rejeita com `ConnectionTimeout` se a promessa não terminar em `ms`. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new ConnectionTimeout()), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 /**
  * Orquestra uma sessão de jogo neste navegador: liga os casos de uso às mudanças
@@ -93,11 +124,11 @@ export class GameSession {
    */
   async start(inviteCode: string | null = null): Promise<void> {
     try {
-      await this.ensurePlayer();
-    } catch {
+      await this.connect(this.ensurePlayer());
+    } catch (error) {
       // Sem identidade (por exemplo, offline na primeira visita): a tela inicial continua usável,
       // e criar/entrar tentam de novo. O modo contra o computador não depende disto.
-      this.goHome('unexpected');
+      this.goHome(error instanceof ConnectionTimeout ? 'unreachable' : 'unexpected');
       return;
     }
 
@@ -120,11 +151,12 @@ export class GameSession {
   async createRoom(bestOf: BestOf = 0, choiceSeconds: ChoiceSeconds = DEFAULT_CHOICE_SECONDS): Promise<void> {
     this.setHome(true, null);
     try {
-      const player = await this.ensurePlayer();
-      const code = await createRoom(this.deps, player, { hostName: this.deps.store.loadNickname(), bestOf, choiceSeconds });
+      const player = await this.connect(this.ensurePlayer());
+      const options = { hostName: this.deps.store.loadNickname(), bestOf, choiceSeconds };
+      const code = await this.connect(createRoom(this.deps, player, options));
       this.attach(code);
-    } catch {
-      this.goHome('unexpected');
+    } catch (error) {
+      this.goHome(error instanceof ConnectionTimeout ? 'unreachable' : 'unexpected');
     }
   }
 
@@ -213,18 +245,29 @@ export class GameSession {
   private async enter(input: string, { showErrors }: { showErrors: boolean }): Promise<void> {
     this.setHome(true, null);
     try {
-      const player = await this.ensurePlayer();
-      const result = await joinRoom(this.deps, input, player, this.deps.store.loadNickname());
+      const player = await this.connect(this.ensurePlayer());
+      const result = await this.connect(joinRoom(this.deps, input, player, this.deps.store.loadNickname()));
       if (result.ok) {
         this.attach(result.code);
         return;
       }
       this.forgetRoom();
       this.goHome(showErrors ? result.error : null);
-    } catch {
+    } catch (error) {
+      // Sem conexão: avisa sempre (mesmo ao voltar à sala salva) e NÃO esquece a sala,
+      // para voltar a ela quando a rede voltar.
+      if (error instanceof ConnectionTimeout) {
+        this.goHome('unreachable');
+        return;
+      }
       this.forgetRoom();
       this.goHome(showErrors ? 'unexpected' : null);
     }
+  }
+
+  /** Espera o servidor até o limite de conexão. */
+  private connect<T>(promise: Promise<T>): Promise<T> {
+    return withTimeout(promise, this.deps.connectTimeoutMs ?? CONNECT_TIMEOUT_MS);
   }
 
   private attach(code: RoomCode): void {

@@ -21,6 +21,20 @@ export class FakeServer extends MemoryRoomServer {
 
 export { MemoryRoomGateway as FakeGateway, MemorySessionStore as MemoryStore };
 
+/** Gateway que "fica sem rede": enquanto `offline` for true, buscar e criar salas nunca respondem. */
+export class OfflineableGateway extends MemoryRoomGateway {
+  offline = true;
+  private readonly never = new Promise<never>(() => undefined);
+
+  override get(...args: Parameters<MemoryRoomGateway['get']>) {
+    return this.offline ? this.never : super.get(...args);
+  }
+
+  override create(...args: Parameters<MemoryRoomGateway['create']>) {
+    return this.offline ? this.never : super.create(...args);
+  }
+}
+
 export const nodeRandom: Random = {
   next: () => Math.random(),
   hex: (length) => randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length),
@@ -39,11 +53,18 @@ export interface TestPlayer {
 export function createPlayer(
   server: MemoryRoomServer,
   name: string,
-  options: { store?: MemorySessionStore; random?: Random; vsComputer?: boolean; choiceTimeoutMs?: number | null } = {},
+  options: {
+    store?: MemorySessionStore;
+    random?: Random;
+    vsComputer?: boolean;
+    choiceTimeoutMs?: number | null;
+    gateway?: MemoryRoomGateway;
+    connectTimeoutMs?: number;
+  } = {},
 ): TestPlayer {
   const id = toPlayerId(name);
   const store = options.store ?? new MemorySessionStore();
-  const gateway = new MemoryRoomGateway(server, id);
+  const gateway = options.gateway ?? new MemoryRoomGateway(server, id);
   const session = new GameSession({
     identity: { ensurePlayer: async () => id },
     gateway,
@@ -52,6 +73,7 @@ export function createPlayer(
     store,
     vsComputer: options.vsComputer ?? false,
     choiceTimeoutMs: options.choiceTimeoutMs,
+    connectTimeoutMs: options.connectTimeoutMs,
   });
   const notices: Notice[] = [];
   session.onNotice((notice) => notices.push(notice));

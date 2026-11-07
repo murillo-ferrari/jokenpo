@@ -8,7 +8,8 @@ import type { JoinError } from './joinRoom';
  * está jogando ("eu" e "adversário"); a UI nunca lida com player1/player2.
  */
 
-export type HomeError = JoinError | 'unexpected';
+/** `unreachable`: o servidor não respondeu a tempo (sem internet, por exemplo). */
+export type HomeError = JoinError | 'unexpected' | 'unreachable';
 
 export type ResetState = 'none' | 'requested-by-me' | 'requested-by-opponent';
 

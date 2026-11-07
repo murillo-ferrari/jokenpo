@@ -54,11 +54,39 @@ p {
 
 /* ---------- Estrutura ---------- */
 
+/*
+ * Cabeçalho fixo no topo ao rolar. As margens negativas anulam o padding de #app,
+ * para ele já começar colado no topo (não "pula" ao grudar) e cobrir a largura toda da coluna.
+ */
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0;
+  /* safe-area: no iPhone com o app instalado, fica abaixo do relógio/câmera. */
+  padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-4) var(--space-3);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Sombra só quando o conteúdo começa a passar por baixo (onde o navegador suporta). */
+@supports (animation-timeline: scroll()) {
+  .app-header {
+    animation: header-shadow linear both;
+    animation-timeline: scroll();
+    animation-range: 0 24px;
+  }
+
+  @keyframes header-shadow {
+    to {
+      box-shadow: 0 1px 0 var(--border), 0 6px 16px rgb(0 0 0 / 0.08);
+    }
+  }
 }
 
 .app-header h1 {

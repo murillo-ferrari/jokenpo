@@ -40,6 +40,7 @@ export const en: Messages = {
       'not-found': 'Room not found. Check the code.',
       full: 'That room already has two players.',
       unexpected: 'Something went wrong. Please try again.',
+      unreachable: "Couldn't connect. Check your internet; meanwhile, you can play against the computer.",
     },
   },
 

@@ -396,6 +396,11 @@ O ícone antigo era um emoji ✊ num quadrado azul. Foram propostos três concei
 
 - O cabeçalho do jogo usa o ícone (versão favicon, 32 px, decorativo com `alt=""`) no lugar dos emojis ✊✋✌️. Em telas estreitas, os botões de som e idioma ficam mais compactos e o título não quebra linha: cabe inteiro em 360 px e, em 320 px, vira "Jokenpô …" sem estourar.
 - `theme-color` ajustado para o índigo do gradiente (`#4338ca`).
+- **Sem rede, o app travava em "Conectando…"** (bug achado ao testar o cabeçalho fixo; já estava publicado). Quem tinha sala salva e abria o app offline ficava preso, com todos os botões desabilitados, inclusive "Jogar contra o computador". Duas causas: o Firebase espera a rede voltar indefinidamente, e a tela inicial travava tudo enquanto a sessão online estava ocupada. Correção:
+  - **Limite de conexão de 10 s** (`CONNECT_TIMEOUT_MS`) para criar sala, entrar e voltar à sala salva. Ao estourar, a tela inicial volta com o aviso `unreachable` ("Não deu para conectar…; enquanto isso, dá para jogar contra o computador") e **a sala salva não é esquecida**.
+  - **Durante a conexão, só "Criar sala" e "Entrar" ficam travados**; apelido, formato e "Jogar contra o computador" seguem disponíveis.
+  - 5 testes novos (sessão e interface, com um gateway que "fica sem rede"), conferidos com mutação. Verificado no Chrome com o servidor fora do ar.
+- **Cabeçalho fixo (sticky)**, pedido após a publicação: fica no topo ao rolar, com fundo translúcido e desfocado e sombra que aparece só quando o conteúdo passa por baixo (animação ligada à rolagem; sem suporte, fica sem a sombra). Respeita a área segura do iPhone. Verificado numa moldura de 360 × 560: sem "pulo" ao grudar.
 - Cache do service worker renomeado para `jokenpo-v3`, para quem já instalou receber os ícones novos.
 - **Bug corrigido de passagem:** no servidor de desenvolvimento, os links do `index.html` saíam com o caminho duplicado (`/jokenpo/jokenpo/...`) e o favicon não carregava. Os links agora começam em `/` e o Vite aplica o `base` certo em dev e no build; conferido nos dois.
 

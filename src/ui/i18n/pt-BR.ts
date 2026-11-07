@@ -40,6 +40,7 @@ export const ptBR: Messages = {
       'not-found': 'Sala não encontrada. Confira o código.',
       full: 'Essa sala já tem dois jogadores.',
       unexpected: 'Algo deu errado. Tente de novo.',
+      unreachable: 'Não deu para conectar. Verifique a internet; enquanto isso, dá para jogar contra o computador.',
     },
   },
 
