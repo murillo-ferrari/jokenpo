@@ -6,7 +6,7 @@ import { commitFor } from '../src/domain/commitment';
 import { ConfirmDialog } from '../src/ui/components/ConfirmDialog';
 import { RESULT_HOLD_MS } from '../src/ui/hooks/useRevealSequence';
 import { App } from '../src/ui/App';
-import { FakeServer, createPlayer, settle, type TestPlayer } from './support/fakeServer';
+import { FakeServer, OfflineableGateway, createPlayer, settle, type TestPlayer } from './support/fakeServer';
 
 /*
  * Telas renderizadas de verdade (num DOM simulado), ligadas ao GameSession
@@ -54,6 +54,39 @@ async function startRenderedGame() {
   await settle();
   return { alice, bob, code };
 }
+
+describe('sem rede', () => {
+  it('com a sala salva sem resposta ("Conectando…"), o jogo contra o computador continua disponível', async () => {
+    const gateway = new OfflineableGateway(server, 'alice' as never);
+    const alice = createPlayer(server, 'alice', { gateway, connectTimeoutMs: 60_000 });
+    alice.store.room = 'AB23' as never;
+    render(
+      <App
+        session={alice.session}
+        language="pt-BR"
+        startComputerGame={(bestOf) => startComputerGame(bestOf, null, { thinkingMs: [10, 20] })}
+      />,
+    );
+    void alice.session.start();
+    await settle();
+
+    expect(screen.getByText('Conectando…')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Criar sala' }) as HTMLButtonElement).disabled).toBe(true);
+    const computer = screen.getByRole('button', { name: 'Jogar contra o computador' }) as HTMLButtonElement;
+    expect(computer.disabled).toBe(false);
+
+    fireEvent.click(computer);
+    await waitFor(() => expect(screen.getByText('Contra o computador')).toBeTruthy());
+  });
+
+  it('quando a conexão não responde a tempo, aparece o aviso com a saída pelo computador', async () => {
+    const gateway = new OfflineableGateway(server, 'alice' as never);
+    const alice = createPlayer(server, 'alice', { gateway, connectTimeoutMs: 30 });
+    alice.store.room = 'AB23' as never;
+    await renderPlayer(alice);
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Não deu para conectar'));
+  });
+});
 
 describe('tela inicial', () => {
   it('mostra criar sala e o campo do código, em pt-BR por padrão', async () => {

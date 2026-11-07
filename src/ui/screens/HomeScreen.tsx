@@ -46,6 +46,10 @@ function tidyRoomCode(input: string): string {
   return input.toUpperCase().replace(/[\s-]/g, '').slice(0, ROOM_CODE_LENGTH);
 }
 
+/*
+ * Enquanto a sessão online está ocupada (conectando), só "Criar sala" e "Entrar" ficam travados.
+ * Apelido, formato e "Jogar contra o computador" não dependem da rede e seguem disponíveis.
+ */
 export function HomeScreen({ view, session, onPlayComputer }: HomeScreenProps) {
   const { t } = useI18n();
   const [code, setCode] = useState('');
@@ -87,7 +91,6 @@ export function HomeScreen({ view, session, onPlayComputer }: HomeScreenProps) {
           autoComplete="nickname"
           maxLength={40}
           value={nickname}
-          disabled={view.busy}
           aria-describedby={ids.nicknameHint}
           onInput={(event) => {
             latestNickname.current = event.currentTarget.value;
@@ -100,7 +103,7 @@ export function HomeScreen({ view, session, onPlayComputer }: HomeScreenProps) {
         </p>
       </div>
 
-      <fieldset class="format-picker" disabled={view.busy}>
+      <fieldset class="format-picker">
         <legend>{t.format.label}</legend>
         <div class="segmented">
           {BEST_OF_OPTIONS.map((option) => (
@@ -118,7 +121,7 @@ export function HomeScreen({ view, session, onPlayComputer }: HomeScreenProps) {
         </div>
       </fieldset>
 
-      <fieldset class="format-picker" disabled={view.busy} aria-describedby={ids.choiceHint}>
+      <fieldset class="format-picker" aria-describedby={ids.choiceHint}>
         <legend>{t.choice.label}</legend>
         <div class="segmented segmented-3">
           {CHOICE_SECONDS_OPTIONS.map((option) => (
@@ -154,7 +157,6 @@ export function HomeScreen({ view, session, onPlayComputer }: HomeScreenProps) {
         <button
           type="button"
           class="button button-secondary button-large"
-          disabled={view.busy}
           onClick={() => {
             commitNickname();
             onPlayComputer(bestOf);
