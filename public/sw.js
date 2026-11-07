@@ -7,7 +7,7 @@
  * Com isso, depois da primeira visita, o modo contra o computador funciona sem internet.
  */
 
-const CACHE = 'jokenpo-v2';
+const CACHE = 'jokenpo-v3';
 
 /*
  * `ignoreVary`: o JS e o CSS do build são pedidos com `crossorigin`, o que envia o cabeçalho Origin.
@@ -17,7 +17,7 @@ const CACHE = 'jokenpo-v2';
  */
 const MATCH = { ignoreVary: true };
 
-const SHELL = ['./', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png'];
+const SHELL = ['./', './manifest.webmanifest', './icons/favicon.svg', './icons/favicon-32.png', './icons/icon-192.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(precache().then(() => self.skipWaiting()));

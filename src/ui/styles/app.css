@@ -62,8 +62,17 @@ p {
 }
 
 .app-header h1 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   font-size: 1.375rem;
   line-height: 1.2;
+}
+
+.app-logo {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
 }
 
 .card {
@@ -948,8 +957,25 @@ p {
     padding: var(--space-4);
   }
 
+  /* Ícone, título, som e idioma numa linha só, mesmo em 360 px. */
   .app-header h1 {
+    min-width: 0;
     font-size: 1.125rem;
+    white-space: nowrap;
+  }
+
+  .app-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-controls {
+    gap: var(--space-1);
+  }
+
+  .icon-toggle,
+  .language-switcher button {
+    min-width: 36px;
   }
 
   .move-emoji {

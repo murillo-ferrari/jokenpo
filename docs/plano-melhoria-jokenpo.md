@@ -383,6 +383,22 @@ A antiga Fase 0, uma correção emergencial no código atual, foi descartada: a 
 
 Estado dos testes após essas correções: 189 unitários e 46 no emulador, todos passando (192 e 50 depois da correção de presença abaixo).
 
+#### Ícone novo (pós-Fase 5)
+
+O ícone antigo era um emoji ✊ num quadrado azul. Foram propostos três conceitos (Ciclo, Duelo e Punho), comparados no Chrome em vários tamanhos e nos fundos claro e escuro. O escolhido foi o **Ciclo**: pedra, papel e tesoura desenhados como objetos (sem emoji) em fichas brancas, com setas de quem vence quem, sobre um gradiente de azul para violeta.
+
+| Arquivo | Uso |
+|---|---|
+| `icon.svg`, `icon-192.png`, `icon-512.png` | Ciclo completo, cantos arredondados (instalação e tela inicial) |
+| `icon-maskable-512.png` | Fundo até a borda, desenho dentro da área segura (Android) |
+| `apple-touch-icon.png` | Fundo até a borda (o iOS arredonda sozinho) |
+| `favicon.svg`, `favicon-32.png` | Versão simplificada, sem setas, com objetos maiores e bordas, legível em 16–32 px |
+
+- O cabeçalho do jogo usa o ícone (versão favicon, 32 px, decorativo com `alt=""`) no lugar dos emojis ✊✋✌️. Em telas estreitas, os botões de som e idioma ficam mais compactos e o título não quebra linha: cabe inteiro em 360 px e, em 320 px, vira "Jokenpô …" sem estourar.
+- `theme-color` ajustado para o índigo do gradiente (`#4338ca`).
+- Cache do service worker renomeado para `jokenpo-v3`, para quem já instalou receber os ícones novos.
+- **Bug corrigido de passagem:** no servidor de desenvolvimento, os links do `index.html` saíam com o caminho duplicado (`/jokenpo/jokenpo/...`) e o favicon não carregava. Os links agora começam em `/` e o Vite aplica o `base` certo em dev e no build; conferido nos dois.
+
 #### Pendência encontrada em teste (resolvida)
 
 - [x] **Presença com várias abas do mesmo jogador.**

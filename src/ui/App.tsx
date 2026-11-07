@@ -85,7 +85,9 @@ function Layout({ session, vsComputer, onPlayComputer }: { session: GameSession;
     <>
       <header class="app-header">
         <h1>
-          <span aria-hidden="true">✊✋✌️</span> {t.appTitle}
+          {/* Decorativo: o título ao lado já diz o nome do jogo. */}
+          <img class="app-logo" src={`${import.meta.env.BASE_URL}icons/favicon.svg`} alt="" width={32} height={32} />
+          <span class="app-title">{t.appTitle}</span>
         </h1>
         <div class="header-controls">
           <SoundToggle />
