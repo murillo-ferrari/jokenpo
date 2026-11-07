@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'preact/hooks';
+import { useCallback, useRef, useState } from 'preact/hooks';
 import type { GameSession } from '../../application/gameSession';
 import type { PlayingView } from '../../application/view';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -6,6 +6,7 @@ import { Countdown } from '../components/Countdown';
 import { MOVE_EMOJI, MOVE_ORDER } from '../components/moves';
 import { RoundCard } from '../components/RoundCard';
 import { Scoreboard, usePlayerNames } from '../components/Scoreboard';
+import { useFitToViewport } from '../hooks/useFitToViewport';
 import { useRevealSequence, type CardStage } from '../hooks/useRevealSequence';
 import { useI18n } from '../i18n';
 
@@ -172,13 +173,17 @@ function ResetControl({ view, session }: { view: PlayingView; session: GameSessi
   );
 }
 
+/** Histórico em summary/details. Aberto, a lista usa só o espaço livre da janela e rola por dentro. */
 function History({ rounds }: { rounds: PlayingView['history'] }) {
   const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const list = useRef<HTMLOListElement>(null);
+  useFitToViewport(list, open);
   return (
-    <details class="history">
+    <details class="history" onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>{t.game.history(rounds.length)}</summary>
       {rounds.length === 0 && <p class="history-empty">{t.game.noRoundsYet}</p>}
-      <ol>
+      <ol ref={list}>
         {rounds.map((round) => (
           <li key={round.number} class={`result-${round.result}`}>
             <span class="history-number">{round.number}</span>

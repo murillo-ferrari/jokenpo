@@ -796,9 +796,16 @@ p {
     transform 0.1s ease;
 }
 
-.move-button:hover:not(:disabled) {
-  border-color: var(--primary);
-  transform: translateY(-2px);
+/*
+ * Hover com cara de hover (borda neutra), nunca a do botão escolhido (azul): com o cursor parado
+ * sobre o botão quando a rodada vira, ele não pode parecer ainda selecionado. Só em aparelho com
+ * mouse: no celular o navegador "gruda" o hover no último botão tocado.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .move-button:hover:not(:disabled):not([aria-pressed='true']) {
+    border-color: var(--text-muted);
+    transform: translateY(-2px);
+  }
 }
 
 .move-button:disabled {
@@ -876,9 +883,18 @@ p {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  /* No máximo 5 rodadas à vista; as demais com rolagem dentro da lista. */
-  max-height: calc(var(--history-row) * var(--history-visible) + var(--space-1) * (var(--history-visible) - 1));
+  /*
+   * No máximo 5 rodadas à vista e nunca mais que o espaço livre da janela (`--fit-height`,
+   * calculado por useFitToViewport): abrir o histórico rola só a lista, não a página.
+   */
+  max-height: min(
+    calc(var(--history-row) * var(--history-visible) + var(--space-1) * (var(--history-visible) - 1)),
+    var(--fit-height, 100vh)
+  );
   overflow-y: auto;
+  /* Contém os textos .visually-hidden (position: absolute) das rodadas roladas para fora;
+     sem isso, eles escapam da lista e esticam a página. */
+  position: relative;
   overscroll-behavior: contain;
 }
 
